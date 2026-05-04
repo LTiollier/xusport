@@ -3,6 +3,7 @@ import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { LoginScreen } from '@/components/screens/LoginScreen';
 import { ApiError, api, auth } from '@/lib/api';
+import { markAuthed, runSync } from '@/lib/store';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -15,6 +16,15 @@ export default function LoginPage() {
     try {
       const { token } = await api.login(email, password);
       auth.setToken(token);
+      markAuthed();
+      // Pull the full bundle into Dexie so the home screen lands with data.
+      // Errors (timeout, partial network) don't block navigation — bootstrap
+      // will retry once we land on /.
+      try {
+        await runSync();
+      } catch {
+        /* ignore — handled in store */
+      }
       router.replace('/');
     } catch (err) {
       const msg =

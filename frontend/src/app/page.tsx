@@ -19,8 +19,15 @@ import {
   CelebrationScreen,
   type CelebrationVariant,
 } from '@/components/workout/CelebrationScreen';
-import { ApiError, api, auth } from '@/lib/api';
-import { useStore } from '@/lib/store';
+import {
+  bootstrap,
+  createLog,
+  logoutAndReset,
+  runSync,
+  saveModel,
+  updateSettings,
+  useStore,
+} from '@/lib/store';
 import { XS } from '@/lib/tokens';
 import type {
   SessionLog,
@@ -49,8 +56,7 @@ export default function HomePage() {
   const [saveError, setSaveError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    void store.reload();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    void bootstrap();
   }, []);
 
   React.useEffect(() => {
@@ -58,6 +64,13 @@ export default function HomePage() {
       router.replace('/login');
     }
   }, [store.ready, store.authed, router]);
+
+  // Re-sync whenever the network comes back up.
+  React.useEffect(() => {
+    const onOnline = () => void runSync();
+    window.addEventListener('online', onOnline);
+    return () => window.removeEventListener('online', onOnline);
+  }, []);
 
   if (!store.ready || !store.authed) {
     return <SplashScreen />;
@@ -70,7 +83,7 @@ export default function HomePage() {
   };
   const pbCount =
     store.dashboard?.pb_count ?? computePbCount(store.history);
-  const streak = store.dashboard?.streak ?? 0;
+  const streak = store.dashboard?.streak ?? computeStreak(store.history);
 
   const goWorkout = (modelId: SessionModel['id']) =>
     setRoute({ name: 'workout', modelId });
@@ -83,51 +96,30 @@ export default function HomePage() {
     setRoute({ name: 'tabs' });
   };
 
-  const handleApiError = (err: unknown) => {
-    if (err instanceof ApiError && err.status === 401) {
-      auth.clearToken();
-      router.replace('/login');
-      return;
-    }
-    setSaveError(
-      err instanceof Error ? err.message : 'Erreur réseau',
-    );
-  };
-
-  const saveModel = async (draft: BuilderDraft) => {
+  const handleSaveModel = async (draft: BuilderDraft) => {
     const editingId =
       route.name === 'builder' ? route.modelId : undefined;
-    const apiBody = {
-      name: draft.name,
-      exercises: draft.blocks.map((b, i) => ({
-        exercise_id: b.exerciseId,
-        sets_count: b.sets,
-        goal_type: b.goalType,
-        goal_value: b.goalType === 'max' ? null : b.goalValue,
-        rest_time: b.rest,
-        order: i,
-      })),
-    };
     try {
-      const res = editingId
-        ? await api.updateModel(editingId, apiBody)
-        : await api.createModel(apiBody);
-      const saved: SessionModel = {
-        ...res.data,
-        // preserve UI-only flavor fields
-        color: res.data.color ?? draft.color,
-        subtitle: res.data.subtitle ?? draft.subtitle,
-      };
-      if (editingId) {
-        store.setModels(
-          store.models.map((m) => (m.id === editingId ? saved : m)),
-        );
-      } else {
-        store.setModels([...store.models, saved]);
-      }
+      await saveModel(
+        {
+          name: draft.name,
+          exercises: draft.blocks.map((b, i) => ({
+            exercise_id: b.exerciseId,
+            sets_count: b.sets,
+            goal_type: b.goalType,
+            goal_value: b.goalType === 'max' ? null : b.goalValue,
+            rest_time: b.rest,
+            order: i,
+          })),
+        },
+        {
+          editingId,
+          flavor: { color: draft.color, subtitle: draft.subtitle },
+        },
+      );
       goTabs('models');
     } catch (err) {
-      handleApiError(err);
+      setSaveError(err instanceof Error ? err.message : 'Erreur locale');
     }
   };
 
@@ -137,7 +129,7 @@ export default function HomePage() {
     const modelId = route.modelId;
     const completed_at = new Date().toISOString();
     try {
-      const { data: saved } = await api.createLog({
+      await createLog({
         session_model_id: modelId,
         duration: summary.duration,
         completed_at,
@@ -146,33 +138,35 @@ export default function HomePage() {
           set_number: r.setNumber,
           reps_done: r.reps,
         })),
+        has_pb: summary.results.some((r) => r.isPb),
       });
-      store.prependLog(saved);
-      void store.refreshDashboard();
+      // Best-effort full sync at end of session — the log is already saved
+      // locally so this never blocks the celebration screen.
+      void runSync();
       setRoute({ name: 'celebration', modelId });
     } catch (err) {
-      handleApiError(err);
+      setSaveError(err instanceof Error ? err.message : 'Erreur locale');
     }
   };
 
-  const updateSettings = async (s: UserSettings) => {
-    const prev = store.profile?.settings ?? s;
-    store.setSettings(s);
+  const handleSettings = async (s: UserSettings) => {
     try {
-      await api.updateSettings(s);
+      await updateSettings(s);
     } catch (err) {
-      store.setSettings(prev);
-      handleApiError(err);
+      setSaveError(err instanceof Error ? err.message : 'Erreur locale');
+    }
+  };
+
+  const handleSyncNow = async () => {
+    try {
+      await runSync();
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Erreur de sync');
     }
   };
 
   const handleLogout = async () => {
-    try {
-      await api.logout();
-    } catch {
-      /* even if it fails, clear token locally */
-    }
-    auth.clearToken();
+    await logoutAndReset();
     router.replace('/login');
   };
 
@@ -221,8 +215,12 @@ export default function HomePage() {
                 history={store.history}
                 pbCount={pbCount}
                 settings={settings}
-                onSettings={updateSettings}
+                onSettings={handleSettings}
                 onLogout={handleLogout}
+                onSyncNow={handleSyncNow}
+                lastSyncAt={store.lastSyncAt}
+                pendingCount={store.pending}
+                syncing={store.syncing}
               />
             )}
           </>
@@ -242,7 +240,7 @@ export default function HomePage() {
           <BuilderScreen
             initial={currentModel}
             exercises={store.exercises}
-            onSave={saveModel}
+            onSave={handleSaveModel}
             onCancel={() => goTabs('models')}
           />
         )}
@@ -277,6 +275,8 @@ export default function HomePage() {
         )}
       </div>
 
+      <OfflineBadge />
+
       {saveError && (
         <ErrorToast
           message={saveError}
@@ -303,6 +303,71 @@ function computePbCount(history: SessionLog[]): number {
   return history.reduce(
     (s, log) => s + log.performance_logs.filter((pl) => pl.is_pb).length,
     0,
+  );
+}
+
+// Streak = consecutive days (anchored on today) with at least one log.
+function computeStreak(history: SessionLog[]): number {
+  if (history.length === 0) return 0;
+  const days = new Set<string>();
+  for (const log of history) {
+    if (!log.completed_at) continue;
+    days.add(new Date(log.completed_at).toISOString().slice(0, 10));
+  }
+  let streak = 0;
+  const cursor = new Date();
+  for (;;) {
+    const key = cursor.toISOString().slice(0, 10);
+    if (!days.has(key)) {
+      // Allow today to be empty before breaking.
+      if (streak === 0) {
+        cursor.setUTCDate(cursor.getUTCDate() - 1);
+        continue;
+      }
+      break;
+    }
+    streak += 1;
+    cursor.setUTCDate(cursor.getUTCDate() - 1);
+    if (streak > 365) break;
+  }
+  return streak;
+}
+
+function OfflineBadge() {
+  const [online, setOnline] = React.useState(true);
+  React.useEffect(() => {
+    const sync = () => setOnline(navigator.onLine);
+    sync();
+    window.addEventListener('online', sync);
+    window.addEventListener('offline', sync);
+    return () => {
+      window.removeEventListener('online', sync);
+      window.removeEventListener('offline', sync);
+    };
+  }, []);
+  if (online) return null;
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        top: 12,
+        left: '50%',
+        transform: 'translateX(-50%)',
+        padding: '6px 12px',
+        background: 'rgba(15,23,42,0.92)',
+        border: `1px solid ${XS.divider}`,
+        color: XS.fg1,
+        borderRadius: 999,
+        fontFamily: XS.mono,
+        fontSize: 10,
+        letterSpacing: 1.5,
+        textTransform: 'uppercase',
+        zIndex: 50,
+        pointerEvents: 'none',
+      }}
+    >
+      Hors ligne
+    </div>
   );
 }
 

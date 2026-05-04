@@ -18,6 +18,10 @@ interface Props {
   settings: UserSettings;
   onSettings: (s: UserSettings) => void;
   onLogout?: () => void;
+  onSyncNow?: () => void;
+  lastSyncAt?: number | null;
+  pendingCount?: number;
+  syncing?: boolean;
 }
 
 export function ProfileScreen({
@@ -27,6 +31,10 @@ export function ProfileScreen({
   settings,
   onSettings,
   onLogout,
+  onSyncNow,
+  lastSyncAt,
+  pendingCount = 0,
+  syncing = false,
 }: Props) {
   const totalReps =
     profile.total_reps ||
@@ -146,8 +154,9 @@ export function ProfileScreen({
         <Card style={{ padding: 0 }}>
           <RowLink
             icon="replay"
-            label="Synchroniser maintenant"
-            detail="Dernière sync · à l'instant"
+            label={syncing ? 'Synchronisation…' : 'Synchroniser maintenant'}
+            detail={syncDetail(lastSyncAt, pendingCount, syncing)}
+            onClick={syncing ? undefined : onSyncNow}
           />
           {onLogout && (
             <RowLink
@@ -170,6 +179,37 @@ export function ProfileScreen({
       </div>
     </div>
   );
+}
+
+function syncDetail(
+  lastSyncAt: number | null | undefined,
+  pendingCount: number,
+  syncing: boolean,
+): string {
+  if (syncing) return 'En cours…';
+  const parts: string[] = [];
+  if (lastSyncAt) {
+    const ago = Date.now() - lastSyncAt;
+    parts.push(`Dernière sync · ${formatAgo(ago)}`);
+  } else {
+    parts.push('Jamais synchronisé');
+  }
+  if (pendingCount > 0) {
+    parts.push(
+      `${pendingCount} action${pendingCount > 1 ? 's' : ''} en attente`,
+    );
+  }
+  return parts.join(' · ');
+}
+
+function formatAgo(ms: number): string {
+  if (ms < 60_000) return 'à l’instant';
+  const m = Math.floor(ms / 60_000);
+  if (m < 60) return `il y a ${m} min`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `il y a ${h} h`;
+  const d = Math.floor(h / 24);
+  return `il y a ${d} j`;
 }
 
 function initials(name: string): string {

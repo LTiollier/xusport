@@ -10,7 +10,7 @@ interface LoginScreenProps {
 }
 
 export function LoginScreen({ onLogin, loading, error }: LoginScreenProps) {
-  const [email, setEmail] = React.useState('leo@xusport.fr');
+  const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [showPwd, setShowPwd] = React.useState(false);
   const [shake, setShake] = React.useState(false);
