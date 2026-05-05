@@ -115,6 +115,8 @@ jobs:
         run: |
           rsync -avz --timeout=60 -e "ssh -p 22 -o StrictHostKeyChecking=no" \
             --delete \
+            --exclude '.htaccess' \
+            --exclude '.env' \
             ./deploy-node/ \
             ${{ secrets.SSH_USER }}@${{ secrets.CPANEL_SERVER }}:/home/tile6213/xusport.ltiollier.fr/frontend/
 
@@ -127,5 +129,7 @@ jobs:
         run: |
           rsync -avz --timeout=60 -e "ssh -p 22 -o StrictHostKeyChecking=no" \
             --delete \
+            --exclude '.htaccess' \
+            --exclude '.env' \
             ./deploy-laravel/ \
             ${{ secrets.SSH_USER }}@${{ secrets.CPANEL_SERVER }}:/home/tile6213/xusport.ltiollier.fr/backend/
