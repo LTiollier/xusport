@@ -1,14 +1,12 @@
 const path = require('path');
 
-// Configuration de l'environnement pour la production
+// Indiquer à Next.js où se trouvent les fichiers
 process.env.NODE_ENV = 'production';
+process.env.NEXT_RUNTIME = 'nodejs';
 
-// 02switch via Passenger définit souvent le PORT automatiquement.
-// Sinon, on utilise le port 3000 par défaut.
-const port = process.env.PORT || 3000;
+// Importation du serveur généré par Next.js standalone
+// On change le répertoire de travail pour que les chemins relatifs dans .next/standalone fonctionnent
+process.chdir(path.join(__dirname, '.next', 'standalone'));
 
-console.log('Starting Next.js server on port:', port);
-
-// Le mode standalone de Next.js génère un serveur prêt à l'emploi.
-// Ce fichier server.js sert de point d'entrée pour l'outil Node.js de 02switch.
-require('./.next/standalone/server.js');
+// Lancement du serveur standalone
+require('./server.js');
