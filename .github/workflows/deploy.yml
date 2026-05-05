@@ -101,10 +101,7 @@ jobs:
 
       - name: Whitelist IP on o2switch
         run: |
-          # On tente de whitelister le port 2222 (standard o2switch) et le 22 au cas où
-          curl -sm 45 -H'Authorization: cpanel ${{ secrets.SSH_USER }}:${{ secrets.CPANEL_API_TOKEN }}' \
-          "https://${{ secrets.CPANEL_SERVER }}:2083/execute/SshWhitelist/add?address=${{ steps.ip.outputs.ipv4 }}&port=2222"
-          
+          # On whiteliste le port 22 qui est celui accepté par l'API et utilisé pour rsync
           curl -sm 45 -H'Authorization: cpanel ${{ secrets.SSH_USER }}:${{ secrets.CPANEL_API_TOKEN }}' \
           "https://${{ secrets.CPANEL_SERVER }}:2083/execute/SshWhitelist/add?address=${{ steps.ip.outputs.ipv4 }}&port=22"
 
