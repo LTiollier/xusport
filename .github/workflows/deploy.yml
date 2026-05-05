@@ -1,0 +1,102 @@
+name: CI/CD Multi-Stack (Next.js & Laravel)
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  # --- JOB 1 : BUILD FRONTEND ---
+  build-node:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: './frontend/package-lock.json'
+
+      - name: Install & Build
+        run: |
+          cd frontend
+          npm ci
+          npm run build
+        env:
+          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
+
+      - name: Prepare Artifact
+        run: |
+          mkdir -p node_deploy/.next/standalone
+          # Copy everything from standalone into .next/standalone
+          cp -r frontend/.next/standalone/. node_deploy/.next/standalone/
+          # Copy static and public to the root as required by Next.js standalone server
+          cp -r frontend/.next/static node_deploy/.next/static
+          cp -r frontend/public node_deploy/public
+          # Copy the custom entry point to the root
+          cp frontend/server.js node_deploy/server.js
+
+      - name: Upload Node Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: node-build
+          path: node_deploy/
+
+  # --- JOB 2 : BUILD LARAVEL ---
+  build-laravel:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          extensions: mbstring, bcmath, gd, zip, dom, curl, libxml, openssl
+
+      - name: Install Composer Dependencies
+        run: |
+          cd backend
+          composer install --no-dev --optimize-autoloader
+
+      - name: Upload Laravel Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: laravel-build
+          path: backend/
+
+  # --- JOB 3 : DEPLOY ---
+  deploy:
+    needs: [build-node, build-laravel]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Node Build
+        uses: actions/download-artifact@v4
+        with:
+          name: node-build
+          path: ./deploy-node
+
+      - name: Download Laravel Build
+        uses: actions/download-artifact@v4
+        with:
+          name: laravel-build
+          path: ./deploy-laravel
+
+      - name: Deploy Frontend to 02switch
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          local-dir: ./deploy-node/
+          server-dir: /home/tile6213/xusport.ltiollier.fr/frontend/
+
+      - name: Deploy Backend to 02switch
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          local-dir: ./deploy-laravel/
+          server-dir: /home/tile6213/xusport.ltiollier.fr/backend/
