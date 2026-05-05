@@ -118,12 +118,12 @@ jobs:
             --exclude '.htaccess' \
             --exclude '.env' \
             ./deploy-node/ \
-            ${{ secrets.SSH_USER }}@${{ secrets.CPANEL_SERVER }}:/home/tile6213/xusport.ltiollier.fr/frontend/
+            ${{ secrets.SSH_USER }}@${{ secrets.CPANEL_SERVER }}:/home/tile6213/xusport.ltiollier.fr/
 
       - name: Trigger Node.js Restart
         run: |
           ssh -p 22 -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.CPANEL_SERVER }} \
-            "mkdir -p /home/tile6213/xusport.ltiollier.fr/frontend/tmp && touch /home/tile6213/xusport.ltiollier.fr/frontend/tmp/restart.txt"
+            "mkdir -p /home/tile6213/xusport.ltiollier.fr/tmp && touch /home/tile6213/xusport.ltiollier.fr/tmp/restart.txt"
 
       - name: Deploy Backend via rsync
         run: |
