@@ -83,20 +83,51 @@ jobs:
           name: laravel-build
           path: ./deploy-laravel
 
-      - name: Deploy Frontend to 02switch
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+      - name: Install SSH Key
+        uses: shimataro/ssh-key-action@v2
         with:
-          server: ${{ secrets.FTP_SERVER }}
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          local-dir: ./deploy-node/
-          server-dir: /home/tile6213/xusport.ltiollier.fr/frontend/
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          known_hosts: unnecessary
+          if_key_exists: fail
 
-      - name: Deploy Backend to 02switch
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server: ${{ secrets.FTP_SERVER }}
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          local-dir: ./deploy-laravel/
-          server-dir: /home/tile6213/xusport.ltiollier.fr/backend/
+      - name: Get Public IP
+        id: ip
+        run: echo "ipv4=$(curl -s https://api.ipify.org)" >> $GITHUB_OUTPUT
+
+      - name: Removing all whitelisted IP
+        run: |
+          curl -sm 45 -H'Authorization: cpanel ${{ secrets.SSH_USER }}:${{ secrets.CPANEL_API_TOKEN }}' \
+          'https://${{ secrets.CPANEL_SERVER }}:2083/execute/SshWhitelist/remove_all'
+
+      - name: Whitelist IP on o2switch
+        run: |
+          # On tente de whitelister le port 2222 (standard o2switch) et le 22 au cas où
+          curl -sm 45 -H'Authorization: cpanel ${{ secrets.SSH_USER }}:${{ secrets.CPANEL_API_TOKEN }}' \
+          "https://${{ secrets.CPANEL_SERVER }}:2083/execute/SshWhitelist/add?address=${{ steps.ip.outputs.ipv4 }}&port=2222"
+          
+          curl -sm 45 -H'Authorization: cpanel ${{ secrets.SSH_USER }}:${{ secrets.CPANEL_API_TOKEN }}' \
+          "https://${{ secrets.CPANEL_SERVER }}:2083/execute/SshWhitelist/add?address=${{ steps.ip.outputs.ipv4 }}&port=22"
+
+      - name: Making sure the IP is whitelisted
+        run: |
+          curl -sm 45 -H'Authorization: cpanel ${{ secrets.SSH_USER }}:${{ secrets.CPANEL_API_TOKEN }}' \
+          "https://${{ secrets.CPANEL_SERVER }}:2083/execute/SshWhitelist/list" | grep "${{ steps.ip.outputs.ipv4 }}"
+
+      - name: Deploy Frontend via rsync
+        run: |
+          rsync -avz --timeout=60 -e "ssh -p 22 -o StrictHostKeyChecking=no" \
+            --delete \
+            ./deploy-node/ \
+            ${{ secrets.SSH_USER }}@${{ secrets.CPANEL_SERVER }}:/home/tile6213/xusport.ltiollier.fr/frontend/
+
+      - name: Trigger Node.js Restart
+        run: |
+          ssh -p 22 -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.CPANEL_SERVER }} \
+            "mkdir -p /home/tile6213/xusport.ltiollier.fr/frontend/tmp && touch /home/tile6213/xusport.ltiollier.fr/frontend/tmp/restart.txt"
+
+      - name: Deploy Backend via rsync
+        run: |
+          rsync -avz --timeout=60 -e "ssh -p 22 -o StrictHostKeyChecking=no" \
+            --delete \
+            ./deploy-laravel/ \
+            ${{ secrets.SSH_USER }}@${{ secrets.CPANEL_SERVER }}:/home/tile6213/xusport.ltiollier.fr/backend/
