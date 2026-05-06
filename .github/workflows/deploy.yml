@@ -30,13 +30,14 @@ jobs:
       - name: Prepare Artifact
         run: |
           mkdir -p node_deploy
-          # Copy everything from standalone to the root of the artifact
-          cp -r frontend/.next/standalone/. node_deploy/
-          # Copy static and public to the root as well
-          # Next.js standalone expects these in the root or next to server.js
+          # Utilisation de rsync pour copier tout le contenu de standalone, y compris les fichiers cachés (.next)
+          # standalone contient déjà un dossier .next/server mais pas .next/static ni public
+          rsync -a frontend/.next/standalone/ node_deploy/
+          
+          # Copie manuelle des fichiers statiques et publics (requis pour le mode standalone)
           mkdir -p node_deploy/.next/static
-          cp -r frontend/.next/static/. node_deploy/.next/static/
-          cp -r frontend/public node_deploy/public
+          rsync -a frontend/.next/static/ node_deploy/.next/static/
+          rsync -a frontend/public/ node_deploy/public/
 
       - name: Upload Node Artifact
         uses: actions/upload-artifact@v4
@@ -117,6 +118,7 @@ jobs:
             --delete \
             --exclude '.htaccess' \
             --exclude '.env' \
+            --exclude 'backend/' \
             ./deploy-node/ \
             ${{ secrets.SSH_USER }}@${{ secrets.CPANEL_SERVER }}:/home/tile6213/xusport.ltiollier.fr/
 
