@@ -150,4 +150,4 @@ jobs:
             --exclude '.htaccess' \
             --exclude '.env' \
             ./deploy-laravel/ \
-            ${{ secrets.SSH_USER }}@${{ secrets.CPANEL_SERVER }}:/home/tile6213/xusport.ltiollier.fr/backend/
+            ${{ secrets.SSH_USER }}@${{ secrets.CPANEL_SERVER }}:/home/tile6213/api.xusport.ltiollier.fr/
