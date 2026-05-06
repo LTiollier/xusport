@@ -68,6 +68,7 @@ export interface UserProfile {
   id: number;
   name: string;
   email: string;
+  created_at?: string;
   total_reps: number;
   total_sessions: number;
   settings: UserSettings;

@@ -24,6 +24,7 @@ final class UserController extends Controller
             'id'             => $user->id,
             'name'           => $user->name,
             'email'          => $user->email,
+            'created_at'     => $user->created_at,
             'total_reps'     => $totalReps,
             'total_sessions' => $totalSessions,
             'settings'       => $user->settings ?? [

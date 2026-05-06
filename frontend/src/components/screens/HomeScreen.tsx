@@ -9,7 +9,7 @@ import {
   SectionHeader,
 } from '@/components/ui/primitives';
 import { Icon } from '@/components/ui/Icon';
-import { computeWeekActivity, fmtDate } from '@/lib/format';
+import { computeWeekActivity, fmtDate, fmtHeaderDate } from '@/lib/format';
 import { find } from '@/lib/store';
 import type { SessionLog, SessionModel } from '@/lib/types';
 
@@ -40,7 +40,7 @@ export function HomeScreen({
   return (
     <div>
       <ScreenHeader
-        kicker="MARDI · 27 AVRIL"
+        kicker={fmtHeaderDate()}
         title="Bonjour Léo"
         right={
           <div

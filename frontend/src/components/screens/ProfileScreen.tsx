@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/primitives';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { MiniStat } from './ModelDetailScreen';
+import { fmtMemberSince } from '@/lib/format';
 import type { SessionLog, UserProfile, UserSettings } from '@/lib/types';
 
 interface Props {
@@ -101,7 +102,7 @@ export function ProfileScreen({
                   marginTop: 6,
                 }}
               >
-                Membre depuis sept. 2025
+                {fmtMemberSince(profile.created_at)}
               </div>
             </div>
           </div>
