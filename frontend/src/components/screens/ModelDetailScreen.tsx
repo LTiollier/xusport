@@ -120,13 +120,79 @@ export function ModelDetailScreen({
               <div style={{ flex: 1 }}>
                 <div
                   style={{
-                    fontFamily: XS.font,
-                    fontSize: 16,
-                    fontWeight: 600,
-                    color: XS.fg0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
                   }}
                 >
-                  {ex.name}
+                  <div
+                    style={{
+                      width: 24,
+                      height: 24,
+                      borderRadius: 6,
+                      background: XS.bg4,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: XS.fg1,
+                      flexShrink: 0,
+                    }}
+                  >
+                    <Icon
+                      name={
+                        [
+                          'home',
+                          'list',
+                          'chart',
+                          'user',
+                          'play',
+                          'pause',
+                          'check',
+                          'plus',
+                          'minus',
+                          'x',
+                          'arrowL',
+                          'arrowR',
+                          'chevR',
+                          'chevD',
+                          'edit',
+                          'trash',
+                          'flame',
+                          'bolt',
+                          'trophy',
+                          'medal',
+                          'timer',
+                          'dumbbell',
+                          'grip',
+                          'volume',
+                          'vibrate',
+                          'calendar',
+                          'clock',
+                          'replay',
+                          'eye',
+                          'eyeOff',
+                          'mail',
+                          'lock',
+                        ].includes(ex.icon as string)
+                          ? (ex.icon as any)
+                          : 'dumbbell'
+                      }
+                      size={14}
+                    />
+                  </div>
+                  <div
+                    style={{
+                      fontFamily: XS.font,
+                      fontSize: 16,
+                      fontWeight: 600,
+                      color: XS.fg0,
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                  >
+                    {ex.name}
+                  </div>
                 </div>
                 <div
                   style={{
