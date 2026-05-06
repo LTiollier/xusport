@@ -184,11 +184,13 @@ export function SectionHeader({
 export function ScreenHeader({
   kicker,
   title,
+  left,
   right,
   paddingTop = 56,
 }: {
   kicker?: string;
   title: string;
+  left?: React.ReactNode;
   right?: React.ReactNode;
   paddingTop?: number;
 }) {
@@ -202,35 +204,38 @@ export function ScreenHeader({
           gap: 12,
         }}
       >
-        <div style={{ minWidth: 0 }}>
-          {kicker && (
-            <div
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+          {left && <div>{left}</div>}
+          <div>
+            {kicker && (
+              <div
+                style={{
+                  fontFamily: XS.mono,
+                  fontSize: 11,
+                  fontWeight: 500,
+                  color: XS.v3,
+                  letterSpacing: 1.6,
+                  textTransform: 'uppercase',
+                  marginBottom: 6,
+                }}
+              >
+                {kicker}
+              </div>
+            )}
+            <h1
               style={{
-                fontFamily: XS.mono,
-                fontSize: 11,
-                fontWeight: 500,
-                color: XS.v3,
-                letterSpacing: 1.6,
-                textTransform: 'uppercase',
-                marginBottom: 6,
+                margin: 0,
+                fontFamily: XS.font,
+                fontSize: 32,
+                fontWeight: 700,
+                color: XS.fg0,
+                letterSpacing: -0.8,
+                lineHeight: 1.05,
               }}
             >
-              {kicker}
-            </div>
-          )}
-          <h1
-            style={{
-              margin: 0,
-              fontFamily: XS.font,
-              fontSize: 32,
-              fontWeight: 700,
-              color: XS.fg0,
-              letterSpacing: -0.8,
-              lineHeight: 1.05,
-            }}
-          >
-            {title}
-          </h1>
+              {title}
+            </h1>
+          </div>
         </div>
         {right}
       </div>

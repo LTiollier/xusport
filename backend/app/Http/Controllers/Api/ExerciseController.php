@@ -16,6 +16,37 @@ final class ExerciseController extends Controller
         return ExerciseResource::collection(Exercise::all());
     }
 
+    public function store(\Illuminate\Http\Request $request): ExerciseResource
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'group' => 'nullable|string|max:255',
+            'icon' => 'nullable|string|max:255',
+        ]);
+
+        return new ExerciseResource(Exercise::create($validated));
+    }
+
+    public function update(\Illuminate\Http\Request $request, Exercise $exercise): ExerciseResource
+    {
+        $validated = $request->validate([
+            'name' => 'sometimes|required|string|max:255',
+            'group' => 'nullable|string|max:255',
+            'icon' => 'nullable|string|max:255',
+        ]);
+
+        $exercise->update($validated);
+
+        return new ExerciseResource($exercise);
+    }
+
+    public function destroy(Exercise $exercise): \Illuminate\Http\Response
+    {
+        $exercise->delete();
+
+        return response()->noContent();
+    }
+
     public function show(Exercise $exercise): ExerciseResource
     {
         return new ExerciseResource($exercise);

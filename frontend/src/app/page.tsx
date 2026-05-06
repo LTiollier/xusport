@@ -10,6 +10,8 @@ import {
   type BuilderDraft,
 } from '@/components/screens/BuilderScreen';
 import { HistoryScreen } from '@/components/screens/HistoryScreen';
+import { ExercisesScreen } from '@/components/screens/ExercisesScreen';
+import { ExerciseBuilderScreen } from '@/components/screens/ExerciseBuilderScreen';
 import { ProfileScreen } from '@/components/screens/ProfileScreen';
 import {
   WorkoutScreen,
@@ -25,11 +27,14 @@ import {
   logoutAndReset,
   runSync,
   saveModel,
+  saveExercise,
+  deleteExercise,
   updateSettings,
   useStore,
 } from '@/lib/store';
 import { XS } from '@/lib/tokens';
 import type {
+  Exercise,
   SessionLog,
   SessionModel,
   UserSettings,
@@ -41,7 +46,9 @@ type Route =
   | { name: 'modelDetail'; modelId: SessionModel['id'] }
   | { name: 'builder'; modelId?: SessionModel['id'] }
   | { name: 'workout'; modelId: SessionModel['id'] }
-  | { name: 'celebration'; modelId: SessionModel['id'] };
+  | { name: 'celebration'; modelId: SessionModel['id'] }
+  | { name: 'exercises' }
+  | { name: 'exerciseBuilder'; exercise?: Exercise };
 
 const WORKOUT_VARIANT: WorkoutVariant = 'B';
 const CELEBRATION_VARIANT: CelebrationVariant = 'A';
@@ -157,6 +164,24 @@ export default function HomePage() {
     }
   };
 
+  const handleSaveExercise = async (payload: { name: string; group?: string | null; icon?: string | null }, id?: Exercise['id']) => {
+    try {
+      await saveExercise(payload, { editingId: id });
+      setRoute({ name: 'exercises' });
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Erreur locale');
+    }
+  };
+
+  const handleDeleteExercise = async (id: Exercise['id']) => {
+    try {
+      await deleteExercise(id);
+      setRoute({ name: 'exercises' });
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Erreur locale');
+    }
+  };
+
   const handleSyncNow = async () => {
     try {
       await runSync();
@@ -218,6 +243,7 @@ export default function HomePage() {
                 onSettings={handleSettings}
                 onLogout={handleLogout}
                 onSyncNow={handleSyncNow}
+                onExercises={() => setRoute({ name: 'exercises' })}
                 lastSyncAt={store.lastSyncAt}
                 pendingCount={store.pending}
                 syncing={store.syncing}
@@ -226,6 +252,23 @@ export default function HomePage() {
           </>
         )}
 
+        {route.name === 'exercises' && (
+          <ExercisesScreen
+            exercises={store.exercises}
+            onBack={() => goTabs('profile')}
+            onCreate={() => setRoute({ name: 'exerciseBuilder' })}
+            onEdit={(ex) => setRoute({ name: 'exerciseBuilder', exercise: ex })}
+          />
+        )}
+
+        {route.name === 'exerciseBuilder' && (
+          <ExerciseBuilderScreen
+            initial={route.exercise}
+            onSave={handleSaveExercise}
+            onDelete={handleDeleteExercise}
+            onCancel={() => setRoute({ name: 'exercises' })}
+          />
+        )}
         {route.name === 'modelDetail' && currentModel && (
           <ModelDetailScreen
             model={currentModel}

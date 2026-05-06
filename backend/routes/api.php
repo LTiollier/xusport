@@ -19,7 +19,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('/sync', SyncController::class);
 
     // 1. Exercices
-    Route::get('/exercises', [ExerciseController::class, 'index']);
+    Route::apiResource('exercises', ExerciseController::class);
 
     // 2. Séances (Workout Models)
     Route::apiResource('models', SessionModelController::class);

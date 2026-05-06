@@ -108,6 +108,18 @@ export const api = {
   exercises: () => request<DataEnvelope<Exercise[]>>('/exercises'),
   exercise: (id: number | string) =>
     request<DataEnvelope<Exercise>>(`/exercises/${id}`),
+  createExercise: (body: { name: string; group?: string | null; icon?: string | null }) =>
+    request<DataEnvelope<Exercise>>('/exercises', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  updateExercise: (id: number | string, body: { name?: string; group?: string | null; icon?: string | null }) =>
+    request<DataEnvelope<Exercise>>(`/exercises/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+  deleteExercise: (id: number | string) =>
+    request<void>(`/exercises/${id}`, { method: 'DELETE' }),
 
   // Models
   models: () => request<DataEnvelope<SessionModel[]>>('/models'),

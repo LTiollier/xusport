@@ -269,6 +269,68 @@ export async function deleteModel(id: SessionModel['id']): Promise<void> {
   void kickSync();
 }
 
+export async function saveExercise(
+  payload: { name: string; group?: string | null; icon?: string | null },
+  opts?: { editingId?: Exercise['id'] },
+): Promise<Exercise> {
+  const ts = nowMs();
+  if (opts?.editingId != null) {
+    const existing = await db().exercises.get(opts.editingId);
+    const next: import('./db').ExerciseRow = {
+      ...(existing ?? { id: opts.editingId, name: payload.name, group: null, icon: null }),
+      ...payload,
+      _local_updated_at: ts,
+    };
+    await db().exercises.put(next);
+    await enqueue({
+      kind: 'exercise.update',
+      id: opts.editingId,
+      payload,
+      created_at: ts,
+    });
+    void kickSync();
+    return next;
+  }
+
+  const id = tempId('exercise');
+  const draft: import('./db').ExerciseRow = {
+    id,
+    ...payload,
+    group: payload.group ?? null,
+    icon: payload.icon ?? null,
+    _local_updated_at: ts,
+  };
+  await db().exercises.put(draft);
+  await enqueue({
+    kind: 'exercise.create',
+    tempId: id,
+    payload,
+    created_at: ts,
+  });
+  void kickSync();
+  return draft;
+}
+
+export async function deleteExercise(id: Exercise['id']): Promise<void> {
+  const ts = nowMs();
+  await db().exercises.delete(id);
+  if (isLocalId(id)) {
+    const queue = await db().sync_queue.toArray();
+    for (const item of queue) {
+      if (
+        item.op.kind === 'exercise.create' &&
+        item.op.tempId === id &&
+        item.id != null
+      ) {
+        await db().sync_queue.delete(item.id);
+      }
+    }
+    return;
+  }
+  await enqueue({ kind: 'exercise.delete', id, created_at: ts });
+  void kickSync();
+}
+
 export async function createLog(input: {
   session_model_id: SessionModel['id'];
   duration: number;

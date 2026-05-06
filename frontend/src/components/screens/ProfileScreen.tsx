@@ -19,6 +19,7 @@ interface Props {
   onSettings: (s: UserSettings) => void;
   onLogout?: () => void;
   onSyncNow?: () => void;
+  onExercises?: () => void;
   lastSyncAt?: number | null;
   pendingCount?: number;
   syncing?: boolean;
@@ -32,6 +33,7 @@ export function ProfileScreen({
   onSettings,
   onLogout,
   onSyncNow,
+  onExercises,
   lastSyncAt,
   pendingCount = 0,
   syncing = false,
@@ -122,7 +124,7 @@ export function ProfileScreen({
       </div>
 
       <SectionHeader title="Préférences" />
-      <div style={{ padding: '0 20px 120px' }}>
+      <div style={{ padding: '0 20px' }}>
         <Card style={{ padding: 0 }}>
           <SettingRow
             icon="volume"
@@ -150,7 +152,26 @@ export function ProfileScreen({
             last
           />
         </Card>
-        <Spacer h={16} />
+      </div>
+
+      <Spacer h={24} />
+
+      <SectionHeader title="Données" />
+      <div style={{ padding: '0 20px' }}>
+        <Card style={{ padding: 0 }}>
+          <RowLink
+            icon="list"
+            label="Gérer les exercices"
+            onClick={onExercises}
+            last
+          />
+        </Card>
+      </div>
+
+      <Spacer h={24} />
+
+      <SectionHeader title="Système" />
+      <div style={{ padding: '0 20px 120px' }}>
         <Card style={{ padding: 0 }}>
           <RowLink
             icon="replay"

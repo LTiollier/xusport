@@ -16,6 +16,7 @@ import type {
 
 export interface ExerciseRow extends Exercise {
   updated_at?: string | null;
+  _local_updated_at?: number;
 }
 
 export interface ModelRow extends SessionModel {
@@ -32,6 +33,23 @@ export interface ProfileRow extends UserProfile {
 }
 
 export type SyncOp =
+  | {
+      kind: 'exercise.create';
+      tempId: string;
+      payload: ExerciseInputPayload;
+      created_at: number;
+    }
+  | {
+      kind: 'exercise.update';
+      id: number | string;
+      payload: ExerciseInputPayload;
+      created_at: number;
+    }
+  | {
+      kind: 'exercise.delete';
+      id: number | string;
+      created_at: number;
+    }
   | {
       kind: 'model.create';
       tempId: string;
@@ -60,6 +78,12 @@ export type SyncOp =
       payload: { sound: boolean; vibrate: boolean; demo_mode: boolean };
       created_at: number;
     };
+
+export interface ExerciseInputPayload {
+  name: string;
+  group?: string | null;
+  icon?: string | null;
+}
 
 export interface ModelInputPayload {
   name: string;
@@ -128,7 +152,7 @@ export function nowMs(): number {
   return Date.now();
 }
 
-export function tempId(prefix: 'model' | 'log'): string {
+export function tempId(prefix: 'exercise' | 'model' | 'log'): string {
   return `local:${prefix}:${crypto.randomUUID()}`;
 }
 

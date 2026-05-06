@@ -31,6 +31,7 @@ import {
 } from './db';
 import type {
   DashboardStats,
+  Exercise,
   SessionLog,
   SessionModel,
   SyncBundle,
@@ -139,6 +140,31 @@ async function syncPush(errors: string[]): Promise<number> {
 async function runOp(item: SyncQueueItem): Promise<void> {
   const op = item.op;
   switch (op.kind) {
+    case 'exercise.create': {
+      const res = await api.createExercise(op.payload);
+      await reconcileLocalId('exercise', op.tempId, res.data);
+      break;
+    }
+    case 'exercise.update': {
+      if (isLocalId(op.id)) {
+        return;
+      }
+      const res = await api.updateExercise(op.id, op.payload);
+      await db().exercises.put({
+        ...res.data,
+        _local_updated_at: undefined,
+      });
+      await db().sync_queue.delete(item.id!);
+      break;
+    }
+    case 'exercise.delete': {
+      if (!isLocalId(op.id)) {
+        await api.deleteExercise(op.id);
+      }
+      await db().exercises.delete(op.id);
+      await db().sync_queue.delete(item.id!);
+      break;
+    }
     case 'model.create': {
       const res = await api.createModel(op.payload);
       await reconcileLocalId('model', op.tempId, res.data);
@@ -198,18 +224,52 @@ async function runOp(item: SyncQueueItem): Promise<void> {
 }
 
 async function reconcileLocalId(
-  kind: 'model' | 'log',
+  kind: 'exercise' | 'model' | 'log',
   tempId: string,
-  serverEntity: SessionModel | SessionLog,
+  serverEntity: Exercise | SessionModel | SessionLog,
 ): Promise<void> {
   const newId = serverEntity.id;
   const d = db();
 
   await d.transaction(
     'rw',
-    [d.models, d.history, d.sync_queue],
+    [d.exercises, d.models, d.history, d.sync_queue],
     async () => {
-      if (kind === 'model') {
+      if (kind === 'exercise') {
+        await d.exercises.delete(tempId);
+        await d.exercises.put({
+          ...(serverEntity as Exercise),
+          _local_updated_at: undefined,
+        });
+        const allModels = await d.models.toArray();
+        for (const model of allModels) {
+          let updated = false;
+          const nextExercises = model.exercises.map(e => {
+            if (String(e.exercise_id) === tempId) {
+              updated = true;
+              return { ...e, exercise_id: newId, exercise: { ...e.exercise, id: newId } };
+            }
+            return e;
+          });
+          if (updated) {
+            await d.models.put({ ...model, exercises: nextExercises });
+          }
+        }
+        const allLogs = await d.history.toArray();
+        for (const log of allLogs) {
+          let updated = false;
+          const nextLogs = log.performance_logs.map(pl => {
+            if (String(pl.exercise_id) === tempId) {
+              updated = true;
+              return { ...pl, exercise_id: newId };
+            }
+            return pl;
+          });
+          if (updated) {
+            await d.history.put({ ...log, performance_logs: nextLogs });
+          }
+        }
+      } else if (kind === 'model') {
         await d.models.delete(tempId);
         await d.models.put({
           ...(serverEntity as SessionModel),
@@ -248,17 +308,36 @@ async function reconcileLocalId(
 }
 
 function opTempId(op: SyncOp): string | null {
-  if (op.kind === 'model.create' || op.kind === 'log.create') return op.tempId;
+  if (op.kind === 'exercise.create' || op.kind === 'model.create' || op.kind === 'log.create') return op.tempId;
   return null;
 }
 
 function rewriteOpId(
   op: SyncOp,
-  kind: 'model' | 'log',
+  kind: 'exercise' | 'model' | 'log',
   tempId: string,
   newId: number | string,
 ): SyncOp | null {
-  if (kind === 'model') {
+  if (kind === 'exercise') {
+    if (
+      (op.kind === 'exercise.update' || op.kind === 'exercise.delete') &&
+      op.id === tempId
+    ) {
+      return { ...op, id: newId };
+    }
+    if (op.kind === 'model.create' || op.kind === 'model.update') {
+      const nextExercises = op.payload.exercises.map(e => 
+        String(e.exercise_id) === tempId ? { ...e, exercise_id: newId } : e
+      );
+      return { ...op, payload: { ...op.payload, exercises: nextExercises } };
+    }
+    if (op.kind === 'log.create') {
+      const nextLogs = op.payload.performance_logs.map(pl => 
+        String(pl.exercise_id) === tempId ? { ...pl, exercise_id: newId } : pl
+      );
+      return { ...op, payload: { ...op.payload, performance_logs: nextLogs } };
+    }
+  } else if (kind === 'model') {
     if (
       (op.kind === 'model.update' || op.kind === 'model.delete') &&
       op.id === tempId
@@ -300,10 +379,14 @@ async function syncPull(errors: string[]): Promise<boolean> {
 
   const d = db();
   const queue = await d.sync_queue.toArray();
+  const lockedExerciseIds = new Set<string>();
   const lockedModelIds = new Set<string>();
   const lockedLogIds = new Set<string>();
   let settingsLocked = false;
   for (const q of queue) {
+    if (q.op.kind === 'exercise.create') lockedExerciseIds.add(q.op.tempId);
+    if (q.op.kind === 'exercise.update' || q.op.kind === 'exercise.delete')
+      lockedExerciseIds.add(String(q.op.id));
     if (q.op.kind === 'model.create') lockedModelIds.add(q.op.tempId);
     if (q.op.kind === 'model.update' || q.op.kind === 'model.delete')
       lockedModelIds.add(String(q.op.id));
@@ -315,9 +398,32 @@ async function syncPull(errors: string[]): Promise<boolean> {
     'rw',
     [d.exercises, d.models, d.history, d.profile],
     async () => {
-      // Exercises: server is authoritative (read-only).
-      await d.exercises.clear();
-      await d.exercises.bulkPut(bundle.exercises);
+      // Exercises: per-id merge like models.
+      const localExercises = await d.exercises.toArray();
+      const localExerciseMap = new Map(
+        localExercises.map((e) => [String(e.id), e]),
+      );
+      const serverExerciseIds = new Set(bundle.exercises.map((e) => String(e.id)));
+
+      for (const server of bundle.exercises) {
+        const local = localExerciseMap.get(String(server.id));
+        if (!local) {
+          await d.exercises.put(server as import('./db').ExerciseRow);
+          continue;
+        }
+        if (lockedExerciseIds.has(String(local.id))) continue;
+        if (isMoreRecent(local, server)) continue;
+        await d.exercises.put({
+          ...server,
+          _local_updated_at: undefined,
+        });
+      }
+      for (const local of localExercises) {
+        const idStr = String(local.id);
+        if (serverExerciseIds.has(idStr)) continue;
+        if (lockedExerciseIds.has(idStr)) continue;
+        await d.exercises.delete(local.id);
+      }
 
       // Models: per-id merge with most-recent-wins. Local rows that have a
       // pending op or a newer _local_updated_at are kept.
@@ -392,10 +498,9 @@ async function syncPull(errors: string[]): Promise<boolean> {
   return true;
 }
 
-function isMoreRecent(local: ModelRow, server: SessionModel): boolean {
+function isMoreRecent(local: { _local_updated_at?: number }, server: any): boolean {
   const localTs = local._local_updated_at ?? 0;
-  const serverUpdated =
-    (server as SessionModel & { updated_at?: string }).updated_at ?? null;
+  const serverUpdated = server.updated_at ?? null;
   const serverTs = serverUpdated ? Date.parse(serverUpdated) : 0;
   if (!localTs) return false;
   if (!serverTs) return true; // server has no timestamp — trust local edit
