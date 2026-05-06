@@ -29,19 +29,3 @@
     RewriteRule ^ index.php [L]
 </IfModule>
 
-# ---------------------------------------------------------------------------
-# CORS – requis sur hébergement mutualisé (Apache intercepte avant PHP)
-# ---------------------------------------------------------------------------
-<IfModule mod_headers.c>
-    # Répondre aux preflight OPTIONS directement (sans passer par Laravel)
-    RewriteEngine On
-    RewriteCond %{REQUEST_METHOD} OPTIONS
-    RewriteRule .* - [R=204,L]
-
-    Header always set Access-Control-Allow-Origin "https://xusport.ltiollier.fr"
-    Header always set Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS"
-    Header always set Access-Control-Allow-Headers "Authorization, Content-Type, Accept, X-Requested-With, X-XSRF-TOKEN"
-    Header always set Access-Control-Allow-Credentials "true"
-    Header always set Access-Control-Max-Age "86400"
-</IfModule>
-
