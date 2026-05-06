@@ -30,20 +30,31 @@ jobs:
       - name: Prepare Artifact
         run: |
           mkdir -p node_deploy
-          # Utilisation de rsync pour copier tout le contenu de standalone, y compris les fichiers cachés (.next)
-          # standalone contient déjà un dossier .next/server mais pas .next/static ni public
-          rsync -a frontend/.next/standalone/ node_deploy/
-          
-          # Copie manuelle des fichiers statiques et publics (requis pour le mode standalone)
+
+          # Copie du contenu de standalone (inclut .next/server, node_modules, server.js, package.json)
+          # cp -r préserve les dossiers cachés comme .next/ contrairement à rsync avec certains flags
+          cp -r frontend/.next/standalone/. node_deploy/
+
+          # Ajout des fichiers statiques et publics requis en standalone
+          # .next/static → assets JS/CSS côté client
+          # public/      → fichiers servis directement (images, manifests, sw.js…)
           mkdir -p node_deploy/.next/static
-          rsync -a frontend/.next/static/ node_deploy/.next/static/
-          rsync -a frontend/public/ node_deploy/public/
+          cp -r frontend/.next/static/. node_deploy/.next/static/
+
+          if [ -d "frontend/public" ]; then
+            mkdir -p node_deploy/public
+            cp -r frontend/public/. node_deploy/public/
+          fi
+
+          # Empaqueter en tar pour préserver les fichiers cachés (.next/, etc.)
+          # actions/upload-artifact ignore les dotfiles par défaut
+          tar -czf node-build.tar.gz -C node_deploy .
 
       - name: Upload Node Artifact
         uses: actions/upload-artifact@v4
         with:
           name: node-build
-          path: node_deploy/
+          path: node-build.tar.gz
 
   # --- JOB 2 : BUILD LARAVEL ---
   build-laravel:
@@ -77,7 +88,12 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: node-build
-          path: ./deploy-node
+          path: ./deploy-node-archive
+
+      - name: Extract Node Build
+        run: |
+          mkdir -p ./deploy-node
+          tar -xzf ./deploy-node-archive/node-build.tar.gz -C ./deploy-node
 
       - name: Download Laravel Build
         uses: actions/download-artifact@v4
