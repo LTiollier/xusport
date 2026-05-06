@@ -73,17 +73,23 @@ jobs:
           cd backend
           composer install --no-dev --optimize-autoloader
 
+      - name: Prepare Laravel Artifact
+        run: |
+          # Empaqueter en tar pour préserver les dotfiles (.htaccess, etc.)
+          # actions/upload-artifact ignore les fichiers/dossiers commençant par '.'
+          tar -czf laravel-build.tar.gz \
+            --exclude='backend/bootstrap/cache/*.php' \
+            --exclude='backend/storage/framework/views/*' \
+            --exclude='backend/storage/framework/cache/data/*' \
+            --exclude='backend/storage/framework/sessions/*' \
+            --exclude='backend/storage/logs/*' \
+            -C backend .
+
       - name: Upload Laravel Artifact
         uses: actions/upload-artifact@v4
         with:
           name: laravel-build
-          path: |
-            backend/
-            !backend/bootstrap/cache/*.php
-            !backend/storage/framework/views/*
-            !backend/storage/framework/cache/data/*
-            !backend/storage/framework/sessions/*
-            !backend/storage/logs/*
+          path: laravel-build.tar.gz
 
   # --- JOB 3 : DEPLOY ---
   deploy:
@@ -105,7 +111,12 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: laravel-build
-          path: ./deploy-laravel
+          path: ./deploy-laravel-archive
+
+      - name: Extract Laravel Build
+        run: |
+          mkdir -p ./deploy-laravel
+          tar -xzf ./deploy-laravel-archive/laravel-build.tar.gz -C ./deploy-laravel
 
       - name: Install SSH Key
         uses: shimataro/ssh-key-action@v2
