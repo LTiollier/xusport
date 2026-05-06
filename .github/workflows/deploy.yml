@@ -123,6 +123,13 @@ jobs:
           curl -sm 45 -H'Authorization: cpanel ${{ secrets.SSH_USER }}:${{ secrets.CPANEL_API_TOKEN }}' \
           "https://${{ secrets.CPANEL_SERVER }}:2083/execute/SshWhitelist/add?address=${{ steps.ip.outputs.ipv4 }}&port=22"
 
+      - name: Whitelist No-IP (accès local)
+        run: |
+          # Résolution DNS du hostname No-IP pour whitelister l'IP de la machine locale
+          NOIP_ADDR=$(dig +short ${{ secrets.NOIP_HOSTNAME }} | tail -n1)
+          curl -sm 45 -H'Authorization: cpanel ${{ secrets.SSH_USER }}:${{ secrets.CPANEL_API_TOKEN }}' \
+          "https://${{ secrets.CPANEL_SERVER }}:2083/execute/SshWhitelist/add?address=${NOIP_ADDR}&port=22"
+
       - name: Making sure the IP is whitelisted
         run: |
           curl -sm 45 -H'Authorization: cpanel ${{ secrets.SSH_USER }}:${{ secrets.CPANEL_API_TOKEN }}' \
