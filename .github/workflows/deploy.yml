@@ -77,7 +77,13 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: laravel-build
-          path: backend/
+          path: |
+            backend/
+            !backend/bootstrap/cache/*.php
+            !backend/storage/framework/views/*
+            !backend/storage/framework/cache/data/*
+            !backend/storage/framework/sessions/*
+            !backend/storage/logs/*
 
   # --- JOB 3 : DEPLOY ---
   deploy:
@@ -156,5 +162,27 @@ jobs:
             --delete \
             --exclude '.htaccess' \
             --exclude '.env' \
+            --exclude 'bootstrap/cache/*.php' \
             ./deploy-laravel/ \
             ${{ secrets.SSH_USER }}@${{ secrets.CPANEL_SERVER }}:/home/tile6213/api.xusport.ltiollier.fr/
+
+      - name: Post-deploy Laravel setup
+        run: |
+          ssh -p 22 -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.CPANEL_SERVER }} bash << 'EOF'
+            set -e
+            APP=/home/tile6213/api.xusport.ltiollier.fr
+
+            # Garantir l'existence des dossiers de stockage (framework peut les supprimer)
+            mkdir -p $APP/storage/framework/{views,sessions,cache/data}
+            mkdir -p $APP/storage/app/{private,public}
+            mkdir -p $APP/storage/logs
+            mkdir -p $APP/bootstrap/cache
+
+            # Permissions lecture/écriture pour le processus PHP
+            chmod -R 775 $APP/storage $APP/bootstrap/cache
+
+            # Regénérer les caches avec les vrais chemins de prod
+            cd $APP && php artisan config:cache
+            cd $APP && php artisan route:cache
+            cd $APP && php artisan view:cache
+          EOF
