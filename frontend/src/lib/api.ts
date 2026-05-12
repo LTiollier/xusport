@@ -157,6 +157,20 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
+  updateLog: (
+    id: number | string,
+    body: {
+      performance_logs: Array<{
+        exercise_id: number | string;
+        set_number: number;
+        reps_done: number;
+      }>;
+    },
+  ) =>
+    request<DataEnvelope<SessionLog>>(`/history/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
   deleteLog: (id: number | string) =>
     request<void>(`/history/${id}`, { method: 'DELETE' }),
 

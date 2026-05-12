@@ -207,6 +207,21 @@ async function runOp(item: SyncQueueItem): Promise<void> {
       await reconcileLocalId('log', op.tempId, res.data);
       break;
     }
+    case 'log.update': {
+      if (isLocalId(op.id)) {
+        // The create op for this log hasn't run yet (or failed). Skip until
+        // it does — the queue is processed in order so we'll come back here
+        // once a real ID exists.
+        return;
+      }
+      const res = await api.updateLog(op.id, op.payload);
+      await db().history.put({
+        ...res.data,
+        _local_updated_at: undefined,
+      });
+      await db().sync_queue.delete(item.id!);
+      break;
+    }
     case 'settings.update': {
       const settings = await api.updateSettings(op.payload);
       const profile = await db().profile.toCollection().first();
@@ -350,6 +365,10 @@ function rewriteOpId(
         payload: { ...op.payload, session_model_id: newId },
       };
     }
+  } else if (kind === 'log') {
+    if (op.kind === 'log.update' && op.id === tempId) {
+      return { ...op, id: newId };
+    }
   }
   return null;
 }
@@ -391,6 +410,7 @@ async function syncPull(errors: string[]): Promise<boolean> {
     if (q.op.kind === 'model.update' || q.op.kind === 'model.delete')
       lockedModelIds.add(String(q.op.id));
     if (q.op.kind === 'log.create') lockedLogIds.add(q.op.tempId);
+    if (q.op.kind === 'log.update') lockedLogIds.add(String(q.op.id));
     if (q.op.kind === 'settings.update') settingsLocked = true;
   }
 
@@ -466,6 +486,7 @@ async function syncPull(errors: string[]): Promise<boolean> {
         bundle.history.map((l) => String(l.id)),
       );
       for (const server of bundle.history) {
+        if (lockedLogIds.has(String(server.id))) continue;
         await d.history.put(server as LogRow);
       }
       for (const local of localLogs) {

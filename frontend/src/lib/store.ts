@@ -378,6 +378,100 @@ export async function createLog(input: {
   return log;
 }
 
+export async function updateLog(
+  logId: SessionLog['id'],
+  performanceLogs: Array<{
+    exercise_id: number | string;
+    set_number: number;
+    reps_done: number;
+  }>,
+): Promise<void> {
+  const ts = nowMs();
+  const existing = await db().history.get(logId);
+  if (!existing) return;
+
+  const byKey = new Map(
+    performanceLogs.map((pl) => [
+      `${String(pl.exercise_id)}#${pl.set_number}`,
+      pl,
+    ]),
+  );
+
+  // Best-effort local recompute of is_pb for the affected exercises by
+  // scanning *other* logs. The backend recomputes authoritatively on push.
+  const otherLogs = await db().history.toArray();
+  const otherMaxByExercise = new Map<string, number>();
+  for (const log of otherLogs) {
+    if (String(log.id) === String(logId)) continue;
+    for (const pl of log.performance_logs) {
+      const k = String(pl.exercise_id);
+      const cur = otherMaxByExercise.get(k) ?? 0;
+      if (pl.reps_done > cur) otherMaxByExercise.set(k, pl.reps_done);
+    }
+  }
+
+  const nextLogs = existing.performance_logs.map((pl) => {
+    const k = `${String(pl.exercise_id)}#${pl.set_number}`;
+    const updated = byKey.get(k);
+    if (!updated) return pl;
+    const otherMax = otherMaxByExercise.get(String(pl.exercise_id)) ?? 0;
+    return {
+      ...pl,
+      reps_done: updated.reps_done,
+      is_pb: updated.reps_done > otherMax,
+    };
+  });
+
+  await db().history.put({
+    ...existing,
+    performance_logs: nextLogs,
+    has_pb: nextLogs.some((pl) => pl.is_pb),
+    _local_updated_at: ts,
+  });
+
+  if (isLocalId(logId)) {
+    // The create op hasn't been pushed yet. Patch the queued payload so the
+    // upcoming POST already has the edited values — no separate update needed.
+    const queue = await db().sync_queue.toArray();
+    for (const item of queue) {
+      if (
+        item.op.kind === 'log.create' &&
+        String(item.op.tempId) === String(logId) &&
+        item.id != null
+      ) {
+        const patched = item.op.payload.performance_logs.map((pl) => {
+          const k = `${String(pl.exercise_id)}#${pl.set_number}`;
+          const upd = byKey.get(k);
+          return upd ? { ...pl, reps_done: upd.reps_done } : pl;
+        });
+        await db().sync_queue.put({
+          ...item,
+          op: {
+            ...item.op,
+            payload: { ...item.op.payload, performance_logs: patched },
+          },
+        });
+      }
+    }
+    void kickSync();
+    return;
+  }
+
+  await enqueue({
+    kind: 'log.update',
+    id: logId,
+    payload: {
+      performance_logs: nextLogs.map((pl) => ({
+        exercise_id: pl.exercise_id,
+        set_number: pl.set_number,
+        reps_done: pl.reps_done,
+      })),
+    },
+    created_at: ts,
+  });
+  void kickSync();
+}
+
 export async function updateSettings(settings: UserSettings): Promise<void> {
   const ts = nowMs();
   const profile = await db().profile.toCollection().first();

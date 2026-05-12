@@ -1,10 +1,10 @@
 'use client';
 import * as React from 'react';
 import { XS } from '@/lib/tokens';
-import { Card, Pill, ScreenHeader, SectionHeader } from '@/components/ui/primitives';
+import { Btn, Card, Pill, ScreenHeader, SectionHeader } from '@/components/ui/primitives';
 import { Icon } from '@/components/ui/Icon';
 import { fmtDate } from '@/lib/format';
-import { find } from '@/lib/store';
+import { find, updateLog } from '@/lib/store';
 import { api } from '@/lib/api';
 import type {
   Exercise,
@@ -34,6 +34,21 @@ export function HistoryScreen({ history, models, exercises }: Props) {
   const [remoteSeries, setRemoteSeries] = React.useState<
     ProgressionPoint[] | null
   >(null);
+
+  const [editingLogId, setEditingLogId] = React.useState<
+    SessionLog['id'] | null
+  >(null);
+  const editingLog = React.useMemo(
+    () =>
+      editingLogId == null
+        ? null
+        : (history.find((l) => String(l.id) === String(editingLogId)) ?? null),
+    [editingLogId, history],
+  );
+  const editingExercise = React.useMemo(
+    () => exercises.find((e) => String(e.id) === String(selectedExId)) ?? null,
+    [exercises, selectedExId],
+  );
 
   React.useEffect(() => {
     let cancelled = false;
@@ -196,14 +211,25 @@ export function HistoryScreen({ history, models, exercises }: Props) {
           const max = Math.max(...sets.map((s) => s.reps_done));
           const hasPb = sets.some((s) => s.is_pb);
           return (
-            <div
+            <button
               key={log.id}
+              type="button"
+              onClick={() => setEditingLogId(log.id)}
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: 12,
                 padding: '12px 0',
+                width: '100%',
+                borderTop: 'none',
+                borderLeft: 'none',
+                borderRight: 'none',
                 borderBottom: `1px solid ${XS.divider}`,
+                background: 'transparent',
+                cursor: 'pointer',
+                textAlign: 'left',
+                color: 'inherit',
+                font: 'inherit',
               }}
             >
               <div
@@ -241,10 +267,18 @@ export function HistoryScreen({ history, models, exercises }: Props) {
               >
                 {max}
               </div>
-            </div>
+            </button>
           );
         })}
       </div>
+
+      {editingLog && editingExercise && (
+        <EditLogModal
+          log={editingLog}
+          exercise={editingExercise}
+          onClose={() => setEditingLogId(null)}
+        />
+      )}
     </div>
   );
 }
@@ -334,3 +368,227 @@ function Chart({
     </svg>
   );
 }
+
+function EditLogModal({
+  log,
+  exercise,
+  onClose,
+}: {
+  log: SessionLog;
+  exercise: Exercise;
+  onClose: () => void;
+}) {
+  const initialSets = React.useMemo(
+    () =>
+      log.performance_logs
+        .filter((pl) => String(pl.exercise_id) === String(exercise.id))
+        .sort((a, b) => a.set_number - b.set_number)
+        .map((pl) => ({ set_number: pl.set_number, reps_done: pl.reps_done })),
+    [log, exercise],
+  );
+
+  const [sets, setSets] = React.useState(initialSets);
+  const [saving, setSaving] = React.useState(false);
+
+  const dirty = React.useMemo(
+    () =>
+      sets.some(
+        (s, i) => s.reps_done !== (initialSets[i]?.reps_done ?? -1),
+      ),
+    [sets, initialSets],
+  );
+
+  const setReps = (idx: number, next: number) => {
+    setSets((cur) =>
+      cur.map((s, i) =>
+        i === idx ? { ...s, reps_done: Math.max(0, next) } : s,
+      ),
+    );
+  };
+
+  const onSave = async () => {
+    if (!dirty || saving) return;
+    setSaving(true);
+    try {
+      await updateLog(
+        log.id,
+        sets.map((s) => ({
+          exercise_id: exercise.id,
+          set_number: s.set_number,
+          reps_done: s.reps_done,
+        })),
+      );
+      onClose();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0,0,0,0.65)',
+        backdropFilter: 'blur(6px)',
+        display: 'flex',
+        alignItems: 'flex-end',
+        justifyContent: 'center',
+        zIndex: 200,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: '100%',
+          maxWidth: 480,
+          background: XS.bg1,
+          borderTopLeftRadius: 24,
+          borderTopRightRadius: 24,
+          border: `1px solid ${XS.hairline}`,
+          borderBottom: 'none',
+          padding: '20px 24px 32px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 16,
+          maxHeight: '85vh',
+          overflowY: 'auto',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <div>
+            <div
+              style={{
+                fontFamily: XS.mono,
+                fontSize: 10,
+                color: XS.v3,
+                letterSpacing: 1.4,
+                textTransform: 'uppercase',
+                marginBottom: 4,
+              }}
+            >
+              {fmtDate(log.completed_at)} · Modifier
+            </div>
+            <div
+              style={{
+                fontFamily: XS.font,
+                fontSize: 22,
+                fontWeight: 700,
+                color: XS.fg0,
+              }}
+            >
+              {exercise.name}
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 12,
+              border: `1px solid ${XS.hairline}`,
+              background: XS.bg2,
+              color: XS.fg1,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Icon name="x" size={16} />
+          </button>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {sets.map((s, i) => (
+            <div
+              key={s.set_number}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                padding: '10px 14px',
+                borderRadius: 14,
+                background: XS.bg2,
+                border: `1px solid ${XS.hairline}`,
+              }}
+            >
+              <div
+                style={{
+                  fontFamily: XS.mono,
+                  fontSize: 11,
+                  color: XS.fg3,
+                  letterSpacing: 1.2,
+                  textTransform: 'uppercase',
+                  width: 56,
+                }}
+              >
+                Série {s.set_number}
+              </div>
+              <button
+                onClick={() => setReps(i, s.reps_done - 1)}
+                style={modalChunkyBtn}
+              >
+                <Icon name="minus" size={18} stroke={2.4} />
+              </button>
+              <div
+                style={{
+                  flex: 1,
+                  textAlign: 'center',
+                  fontFamily: XS.font,
+                  fontSize: 32,
+                  fontWeight: 700,
+                  color: XS.fg0,
+                  fontVariantNumeric: 'tabular-nums',
+                }}
+              >
+                {s.reps_done}
+              </div>
+              <button
+                onClick={() => setReps(i, s.reps_done + 1)}
+                style={modalChunkyBtn}
+              >
+                <Icon name="plus" size={18} stroke={2.4} />
+              </button>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ display: 'flex', gap: 10 }}>
+          <Btn kind="secondary" onClick={onClose} style={{ flex: 1 }}>
+            Annuler
+          </Btn>
+          <Btn
+            kind="primary"
+            onClick={onSave}
+            disabled={!dirty || saving}
+            style={{ flex: 2 }}
+          >
+            <Icon name="check" size={16} stroke={2.4} />{' '}
+            {saving ? 'Enregistrement…' : 'Enregistrer'}
+          </Btn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const modalChunkyBtn: React.CSSProperties = {
+  width: 44,
+  height: 44,
+  borderRadius: 14,
+  background: XS.bg3,
+  border: `1px solid ${XS.hairline}`,
+  color: XS.fg0,
+  cursor: 'pointer',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+};

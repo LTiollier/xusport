@@ -77,11 +77,42 @@ final class SessionLogController extends Controller
         abort_if($history->user_id !== $request->user()->id, 403);
 
         $data = $request->validate([
-            'completed_at' => ['sometimes', 'date'],
-            'synced_at'    => ['nullable', 'date'],
+            'completed_at'                    => ['sometimes', 'date'],
+            'synced_at'                       => ['nullable', 'date'],
+            'duration'                        => ['sometimes', 'integer', 'min:0'],
+            'performance_logs'                => ['sometimes', 'array', 'min:1'],
+            'performance_logs.*.exercise_id'  => ['required_with:performance_logs', 'integer', 'exists:exercises,id'],
+            'performance_logs.*.set_number'   => ['required_with:performance_logs', 'integer', 'min:1'],
+            'performance_logs.*.reps_done'    => ['required_with:performance_logs', 'integer', 'min:0'],
         ]);
 
-        $history->update($data);
+        $scalarFields = array_intersect_key(
+            $data,
+            array_flip(['completed_at', 'synced_at', 'duration'])
+        );
+        if ($scalarFields !== []) {
+            $history->update($scalarFields);
+        }
+
+        if (isset($data['performance_logs'])) {
+            $pbMap = $this->computePbMap(
+                $request->user()->id,
+                $data['performance_logs'],
+                $history->id
+            );
+
+            $history->performanceLogs()->delete();
+            $history->performanceLogs()->createMany(
+                array_map(
+                    fn(array $log): array => [
+                        ...$log,
+                        'is_pb' => $log['reps_done'] > ($pbMap[$log['exercise_id']] ?? 0),
+                    ],
+                    $data['performance_logs']
+                )
+            );
+        }
+
         $history->load('performanceLogs');
 
         return new SessionLogResource($history);
@@ -96,14 +127,20 @@ final class SessionLogController extends Controller
     }
 
     /** @param array<int, array{exercise_id: int, reps_done: int}> $perfLogs */
-    private function computePbMap(int $userId, array $perfLogs): array
+    private function computePbMap(int $userId, array $perfLogs, ?int $excludeSessionLogId = null): array
     {
         $exerciseIds = array_unique(array_column($perfLogs, 'exercise_id'));
 
-        return PerformanceLog::query()
+        $query = PerformanceLog::query()
             ->join('session_logs', 'performance_logs.session_log_id', '=', 'session_logs.id')
             ->where('session_logs.user_id', $userId)
-            ->whereIn('performance_logs.exercise_id', $exerciseIds)
+            ->whereIn('performance_logs.exercise_id', $exerciseIds);
+
+        if ($excludeSessionLogId !== null) {
+            $query->where('session_logs.id', '!=', $excludeSessionLogId);
+        }
+
+        return $query
             ->groupBy('performance_logs.exercise_id')
             ->selectRaw('performance_logs.exercise_id, MAX(reps_done) as max_reps')
             ->pluck('max_reps', 'exercise_id')

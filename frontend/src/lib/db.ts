@@ -74,6 +74,12 @@ export type SyncOp =
       created_at: number;
     }
   | {
+      kind: 'log.update';
+      id: number | string;
+      payload: LogUpdatePayload;
+      created_at: number;
+    }
+  | {
       kind: 'settings.update';
       payload: { sound: boolean; vibrate: boolean; demo_mode: boolean };
       created_at: number;
@@ -101,6 +107,14 @@ export interface LogInputPayload {
   session_model_id: number | string;
   duration: number;
   completed_at: string;
+  performance_logs: Array<{
+    exercise_id: number | string;
+    set_number: number;
+    reps_done: number;
+  }>;
+}
+
+export interface LogUpdatePayload {
   performance_logs: Array<{
     exercise_id: number | string;
     set_number: number;

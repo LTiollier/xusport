@@ -97,7 +97,7 @@ Completed workout records. `is_pb` is **computed server-side** on POST.
 | GET | `/history` | — | `{data: SessionLog[]}` |
 | POST | `/history` | See below | 201 `{data: SessionLog}` |
 | GET | `/history/{id}` | — | `{data: SessionLog}` |
-| PUT | `/history/{id}` | `{completed_at?, synced_at?}` | `{data: SessionLog}` |
+| PUT | `/history/{id}` | `{completed_at?, synced_at?, duration?, performance_logs?}` | `{data: SessionLog}` |
 | DELETE | `/history/{id}` | — | 204 |
 
 **POST body:**
@@ -115,6 +115,10 @@ Completed workout records. `is_pb` is **computed server-side** on POST.
 ```
 `synced_at` defaults to `now()` if omitted.  
 `is_pb` = true when `reps_done` exceeds the user's all-time max for that exercise.
+
+**PUT body (optional fields):** when `performance_logs` is provided, the
+session's existing `performance_logs` are replaced and `is_pb` is recomputed
+for each new row against the user's max across *other* sessions.
 
 ```ts
 SessionLog = {
