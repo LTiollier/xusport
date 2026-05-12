@@ -2,7 +2,7 @@
 import * as React from 'react';
 import { XS } from '@/lib/tokens';
 import { Btn } from '@/components/ui/primitives';
-import { Icon } from '@/components/ui/Icon';
+import { Icon, resolveIconName } from '@/components/ui/Icon';
 import { fmtTime } from '@/lib/format';
 import { find } from '@/lib/store';
 import type {
@@ -1208,7 +1208,7 @@ function RestViewB({
               fontSize: 22,
             }}
           >
-            {next.exerciseIcon}
+            <Icon name={resolveIconName(next.exerciseIcon)} size={22} />
           </div>
           <div style={{ flex: 1 }}>
             <div

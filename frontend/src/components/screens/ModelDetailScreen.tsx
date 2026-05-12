@@ -2,7 +2,7 @@
 import * as React from 'react';
 import { XS } from '@/lib/tokens';
 import { Btn, Pill, SectionHeader } from '@/components/ui/primitives';
-import { Icon } from '@/components/ui/Icon';
+import { Icon, resolveIconName } from '@/components/ui/Icon';
 import { find } from '@/lib/store';
 import type { Exercise, SessionModel } from '@/lib/types';
 
@@ -138,47 +138,7 @@ export function ModelDetailScreen({
                       flexShrink: 0,
                     }}
                   >
-                    <Icon
-                      name={
-                        [
-                          'home',
-                          'list',
-                          'chart',
-                          'user',
-                          'play',
-                          'pause',
-                          'check',
-                          'plus',
-                          'minus',
-                          'x',
-                          'arrowL',
-                          'arrowR',
-                          'chevR',
-                          'chevD',
-                          'edit',
-                          'trash',
-                          'flame',
-                          'bolt',
-                          'trophy',
-                          'medal',
-                          'timer',
-                          'dumbbell',
-                          'grip',
-                          'volume',
-                          'vibrate',
-                          'calendar',
-                          'clock',
-                          'replay',
-                          'eye',
-                          'eyeOff',
-                          'mail',
-                          'lock',
-                        ].includes(ex.icon as string)
-                          ? (ex.icon as any)
-                          : 'dumbbell'
-                      }
-                      size={14}
-                    />
+                    <Icon name={resolveIconName(ex.icon)} size={14} />
                   </div>
                   <div
                     style={{

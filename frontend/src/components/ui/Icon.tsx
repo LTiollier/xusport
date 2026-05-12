@@ -1,38 +1,23 @@
 import * as React from 'react';
 
-export type IconName =
-  | 'home'
-  | 'list'
-  | 'chart'
-  | 'user'
-  | 'play'
-  | 'pause'
-  | 'check'
-  | 'plus'
-  | 'minus'
-  | 'x'
-  | 'arrowL'
-  | 'arrowR'
-  | 'chevR'
-  | 'chevD'
-  | 'edit'
-  | 'trash'
-  | 'flame'
-  | 'bolt'
-  | 'trophy'
-  | 'medal'
-  | 'timer'
-  | 'dumbbell'
-  | 'grip'
-  | 'volume'
-  | 'vibrate'
-  | 'calendar'
-  | 'clock'
-  | 'replay'
-  | 'eye'
-  | 'eyeOff'
-  | 'mail'
-  | 'lock';
+export const ICON_NAMES = [
+  'home', 'list', 'chart', 'user', 'play', 'pause', 'check', 'plus',
+  'minus', 'x', 'arrowL', 'arrowR', 'chevR', 'chevD', 'edit', 'trash',
+  'flame', 'bolt', 'trophy', 'medal', 'timer', 'dumbbell', 'grip',
+  'volume', 'vibrate', 'calendar', 'clock', 'replay', 'eye', 'eyeOff',
+  'mail', 'lock',
+] as const;
+
+export type IconName = (typeof ICON_NAMES)[number];
+
+const ICON_NAME_SET = new Set<string>(ICON_NAMES);
+
+export function resolveIconName(
+  icon: string | null | undefined,
+  fallback: IconName = 'dumbbell',
+): IconName {
+  return icon && ICON_NAME_SET.has(icon) ? (icon as IconName) : fallback;
+}
 
 interface IconProps {
   name: IconName;

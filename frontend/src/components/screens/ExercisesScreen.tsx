@@ -2,7 +2,7 @@
 import * as React from 'react';
 import { XS } from '@/lib/tokens';
 import { Card, ScreenHeader } from '@/components/ui/primitives';
-import { Icon } from '@/components/ui/Icon';
+import { Icon, resolveIconName } from '@/components/ui/Icon';
 import type { Exercise } from '@/lib/types';
 
 interface ExercisesScreenProps {
@@ -98,7 +98,7 @@ export function ExercisesScreen({
                     flexShrink: 0,
                   }}
                 >
-                  <Icon name={['home', 'list', 'chart', 'user', 'play', 'pause', 'check', 'plus', 'minus', 'x', 'arrowL', 'arrowR', 'chevR', 'chevD', 'edit', 'trash', 'flame', 'bolt', 'trophy', 'medal', 'timer', 'dumbbell', 'grip', 'volume', 'vibrate', 'calendar', 'clock', 'replay', 'eye', 'eyeOff', 'mail', 'lock'].includes(ex.icon as string) ? (ex.icon as any) : 'dumbbell'} size={20} />
+                  <Icon name={resolveIconName(ex.icon)} size={20} />
                 </div>
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <div
