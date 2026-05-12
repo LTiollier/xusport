@@ -102,6 +102,51 @@ export function WorkoutScreen({
     return () => clearInterval(t);
   }, []);
 
+  // Keep the screen awake for the whole session (Screen Wake Lock API).
+  // Browsers auto-release the lock when the tab is hidden, so we re-acquire
+  // it on visibilitychange.
+  React.useEffect(() => {
+    if (typeof navigator === 'undefined' || !('wakeLock' in navigator)) {
+      return;
+    }
+    let sentinel: WakeLockSentinel | null = null;
+    let cancelled = false;
+
+    const acquire = async () => {
+      try {
+        const lock = await navigator.wakeLock.request('screen');
+        if (cancelled) {
+          lock.release().catch(() => {});
+          return;
+        }
+        sentinel = lock;
+        lock.addEventListener('release', () => {
+          if (sentinel === lock) sentinel = null;
+        });
+      } catch {
+        // Ignored: page hidden, low battery, or unsupported context.
+      }
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible' && !sentinel) {
+        acquire();
+      }
+    };
+
+    acquire();
+    document.addEventListener('visibilitychange', onVisibility);
+
+    return () => {
+      cancelled = true;
+      document.removeEventListener('visibilitychange', onVisibility);
+      if (sentinel) {
+        sentinel.release().catch(() => {});
+        sentinel = null;
+      }
+    };
+  }, []);
+
   // Rest countdown — runs during BOTH 'logReps' and 'rest' phases
   React.useEffect(() => {
     if (phase !== 'logReps' && phase !== 'rest') return;
