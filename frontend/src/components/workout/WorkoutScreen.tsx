@@ -81,20 +81,35 @@ export function WorkoutScreen({
   const [results, setResults] = React.useState<SetResult[]>([]);
   const [reps, setReps] = React.useState(0);
   const [elapsed, setElapsed] = React.useState(0);
+  const [editingResultIdx, setEditingResultIdx] = React.useState<number | null>(
+    null,
+  );
 
   const cur = sets[idx];
   const isLast = idx === sets.length - 1;
 
+  // Latest-value refs so the interval callback (captured at phase change)
+  // can read the up-to-date reps and edit flag when the timer expires.
+  const repsRef = React.useRef(reps);
+  const editingResultIdxRef = React.useRef(editingResultIdx);
+  React.useEffect(() => {
+    repsRef.current = reps;
+  }, [reps]);
+  React.useEffect(() => {
+    editingResultIdxRef.current = editingResultIdx;
+  }, [editingResultIdx]);
+
   // Prefill default reps for logging UI
   React.useEffect(() => {
     if (!cur) return;
+    if (editingResultIdx !== null) return;
     if (cur.goalType === 'fixed') {
       setReps(cur.goalValue ?? 0);
     } else {
       const last = find.lastRepsFor(history, cur.exerciseId, cur.setNumber - 1);
       setReps(last ?? 8);
     }
-  }, [idx, cur, history]);
+  }, [idx, cur, history, editingResultIdx]);
 
   // Total elapsed
   React.useEffect(() => {
@@ -158,7 +173,7 @@ export function WorkoutScreen({
           if (settings.vibrate && navigator.vibrate) {
             navigator.vibrate([120, 80, 120]);
           }
-          setTimeout(() => goNext(), 200);
+          setTimeout(() => onRestExpired(), 200);
           return 0;
         }
         return r - 1;
@@ -179,6 +194,18 @@ export function WorkoutScreen({
     if (!cur) return;
     const pb = find.pbFor(history, cur.exerciseId);
     const isPb = pb > 0 ? reps > pb : reps > 0;
+
+    if (editingResultIdx !== null) {
+      setResults((prev) =>
+        prev.map((r, i) =>
+          i === editingResultIdx ? { ...r, reps, isPb } : r,
+        ),
+      );
+      setEditingResultIdx(null);
+      setPhase('rest');
+      return;
+    }
+
     const newResults: SetResult[] = [
       ...results,
       {
@@ -195,6 +222,30 @@ export function WorkoutScreen({
       return;
     }
     setPhase('rest');
+  }
+
+  function startEditLast() {
+    if (results.length === 0) return;
+    const lastIdx = results.length - 1;
+    setEditingResultIdx(lastIdx);
+    setReps(results[lastIdx].reps);
+    setPhase('logReps');
+  }
+
+  function onRestExpired() {
+    const editedIdx = editingResultIdxRef.current;
+    if (editedIdx !== null && cur) {
+      const editedReps = repsRef.current;
+      const pb = find.pbFor(history, cur.exerciseId);
+      const isPb = pb > 0 ? editedReps > pb : editedReps > 0;
+      setResults((prev) =>
+        prev.map((r, i) =>
+          i === editedIdx ? { ...r, reps: editedReps, isPb } : r,
+        ),
+      );
+      setEditingResultIdx(null);
+    }
+    goNext();
   }
 
   function goNext() {
@@ -358,6 +409,7 @@ export function WorkoutScreen({
           onValidate={logReps}
           pb={pb}
           isLast={isLast}
+          isEditing={editingResultIdx !== null}
         />
       )}
 
@@ -368,6 +420,7 @@ export function WorkoutScreen({
             total={restTotal}
             onSkip={skipRest}
             onAdd={() => setRestLeft((r) => r + 15)}
+            onEdit={startEditLast}
             next={next}
             lastReps={lastResult?.reps}
             lastIsPb={lastResult?.isPb}
@@ -378,6 +431,7 @@ export function WorkoutScreen({
             total={restTotal}
             onSkip={skipRest}
             onAdd={() => setRestLeft((r) => r + 15)}
+            onEdit={startEditLast}
             next={next}
             lastReps={lastResult?.reps}
             lastIsPb={lastResult?.isPb}
@@ -757,6 +811,7 @@ function LogRepsView({
   onValidate,
   pb,
   isLast,
+  isEditing,
 }: {
   cur: FlatSet;
   reps: number;
@@ -764,6 +819,7 @@ function LogRepsView({
   onValidate: () => void;
   pb: number;
   isLast: boolean;
+  isEditing: boolean;
 }) {
   const isPb = pb > 0 && reps > pb;
   return (
@@ -899,7 +955,11 @@ function LogRepsView({
         style={{ height: 60, fontSize: 17 }}
       >
         <Icon name="check" size={18} stroke={2.4} />{' '}
-        {isLast ? 'Terminer la séance' : `Valider · ${reps} reps`}
+        {isEditing
+          ? `Mettre à jour · ${reps} reps`
+          : isLast
+            ? 'Terminer la séance'
+            : `Valider · ${reps} reps`}
       </Btn>
     </div>
   );
@@ -923,6 +983,7 @@ interface RestProps {
   total: number;
   onSkip: () => void;
   onAdd: () => void;
+  onEdit: () => void;
   next?: FlatSet;
   lastReps?: number;
   lastIsPb?: boolean;
@@ -933,6 +994,7 @@ function RestViewA({
   total,
   onSkip,
   onAdd,
+  onEdit,
   next,
   lastReps,
   lastIsPb,
@@ -1080,6 +1142,11 @@ function RestViewA({
       )}
 
       <div style={{ display: 'flex', gap: 10 }}>
+        {lastReps != null && (
+          <Btn kind="ghost" onClick={onEdit} style={{ flex: 1 }}>
+            <Icon name="edit" size={16} /> Modifier
+          </Btn>
+        )}
         <Btn kind="secondary" onClick={onAdd} style={{ flex: 1 }}>
           +15s
         </Btn>
@@ -1096,6 +1163,7 @@ function RestViewB({
   total,
   onSkip,
   onAdd,
+  onEdit,
   next,
   lastReps,
   lastIsPb,
@@ -1283,6 +1351,11 @@ function RestViewB({
       )}
 
       <div style={{ display: 'flex', gap: 10 }}>
+        {lastReps != null && (
+          <Btn kind="ghost" onClick={onEdit} style={{ flex: 1 }}>
+            <Icon name="edit" size={16} /> Modifier
+          </Btn>
+        )}
         <Btn kind="secondary" onClick={onAdd} style={{ flex: 1 }}>
           +15s
         </Btn>
