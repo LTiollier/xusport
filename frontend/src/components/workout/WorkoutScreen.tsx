@@ -103,11 +103,13 @@ export function WorkoutScreen({
   React.useEffect(() => {
     if (!cur) return;
     if (editingResultIdx !== null) return;
-    if (cur.goalType === 'fixed') {
+    const last = find.lastRepsFor(history, cur.exerciseId, cur.setNumber - 1);
+    if (last != null) {
+      setReps(last);
+    } else if (cur.goalType === 'fixed') {
       setReps(cur.goalValue ?? 0);
     } else {
-      const last = find.lastRepsFor(history, cur.exerciseId, cur.setNumber - 1);
-      setReps(last ?? 8);
+      setReps(8);
     }
   }, [idx, cur, history, editingResultIdx]);
 
