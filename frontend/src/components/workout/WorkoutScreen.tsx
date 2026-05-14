@@ -60,6 +60,21 @@ function flattenSets(
 
 type Phase = 'exercise' | 'logReps' | 'rest';
 
+function useIsPhoneLandscape() {
+  const [isLandscape, setIsLandscape] = React.useState(false);
+  React.useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mql = window.matchMedia(
+      '(orientation: landscape) and (max-height: 500px)',
+    );
+    const update = () => setIsLandscape(mql.matches);
+    update();
+    mql.addEventListener('change', update);
+    return () => mql.removeEventListener('change', update);
+  }, []);
+  return isLandscape;
+}
+
 export function WorkoutScreen({
   model,
   exercises,
@@ -69,6 +84,8 @@ export function WorkoutScreen({
   onComplete,
   onAbort,
 }: Props) {
+  const landscape = useIsPhoneLandscape();
+
   const sets = React.useMemo(
     () => flattenSets(model, exercises),
     [model, exercises],
@@ -291,7 +308,7 @@ export function WorkoutScreen({
       <div
         style={{
           position: 'absolute',
-          top: 56,
+          top: landscape ? 12 : 56,
           left: 0,
           right: 0,
           padding: '0 20px',
@@ -392,6 +409,7 @@ export function WorkoutScreen({
             completedInBlock={completedInBlock}
             totalSetsInBlock={totalSetsInBlock}
             pb={pb}
+            landscape={landscape}
           />
         ) : (
           <ExerciseViewB
@@ -400,6 +418,7 @@ export function WorkoutScreen({
             completedInBlock={completedInBlock}
             totalSetsInBlock={totalSetsInBlock}
             pb={pb}
+            landscape={landscape}
           />
         ))}
 
@@ -412,6 +431,7 @@ export function WorkoutScreen({
           pb={pb}
           isLast={isLast}
           isEditing={editingResultIdx !== null}
+          landscape={landscape}
         />
       )}
 
@@ -426,6 +446,7 @@ export function WorkoutScreen({
             next={next}
             lastReps={lastResult?.reps}
             lastIsPb={lastResult?.isPb}
+            landscape={landscape}
           />
         ) : (
           <RestViewB
@@ -437,6 +458,7 @@ export function WorkoutScreen({
             next={next}
             lastReps={lastResult?.reps}
             lastIsPb={lastResult?.isPb}
+            landscape={landscape}
           />
         ))}
     </div>
@@ -449,6 +471,7 @@ interface ExerciseViewProps {
   completedInBlock: number;
   totalSetsInBlock: number;
   pb: number;
+  landscape: boolean;
 }
 
 function ExerciseViewA({
@@ -457,7 +480,19 @@ function ExerciseViewA({
   completedInBlock,
   totalSetsInBlock,
   pb,
+  landscape,
 }: ExerciseViewProps) {
+  if (landscape) {
+    return (
+      <ExerciseViewALandscape
+        cur={cur}
+        onDone={onDone}
+        completedInBlock={completedInBlock}
+        totalSetsInBlock={totalSetsInBlock}
+        pb={pb}
+      />
+    );
+  }
   return (
     <div
       style={{
@@ -623,7 +658,19 @@ function ExerciseViewB({
   completedInBlock,
   totalSetsInBlock,
   pb,
+  landscape,
 }: ExerciseViewProps) {
+  if (landscape) {
+    return (
+      <ExerciseViewBLandscape
+        cur={cur}
+        onDone={onDone}
+        completedInBlock={completedInBlock}
+        totalSetsInBlock={totalSetsInBlock}
+        pb={pb}
+      />
+    );
+  }
   return (
     <div
       style={{
@@ -806,6 +853,368 @@ function ExerciseViewB({
   );
 }
 
+type LandscapeExerciseProps = Omit<ExerciseViewProps, 'landscape'>;
+
+function ExerciseViewALandscape({
+  cur,
+  onDone,
+  completedInBlock,
+  totalSetsInBlock,
+  pb,
+}: LandscapeExerciseProps) {
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        inset: 0,
+        padding: '56px 28px 14px',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
+        {Array.from({ length: totalSetsInBlock }).map((_, i) => (
+          <div
+            key={i}
+            style={{
+              flex: 1,
+              height: 3,
+              borderRadius: 2,
+              background:
+                i < completedInBlock
+                  ? XS.v2
+                  : i === completedInBlock
+                    ? XS.v3
+                    : XS.bg4,
+            }}
+          />
+        ))}
+      </div>
+
+      <div
+        style={{
+          flex: 1,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 24,
+          minHeight: 0,
+        }}
+      >
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div
+            style={{
+              fontFamily: XS.mono,
+              fontSize: 11,
+              color: XS.v3,
+              letterSpacing: 1.8,
+              textTransform: 'uppercase',
+              marginBottom: 8,
+            }}
+          >
+            Série {cur.setNumber}/{totalSetsInBlock}
+          </div>
+          <h1
+            style={{
+              margin: 0,
+              fontFamily: XS.font,
+              fontSize: 34,
+              fontWeight: 800,
+              color: XS.fg0,
+              letterSpacing: -1,
+              lineHeight: 1,
+              marginBottom: 6,
+            }}
+          >
+            {cur.exerciseName}
+          </h1>
+          <div
+            style={{
+              fontFamily: XS.font,
+              fontSize: 13,
+              color: XS.fg2,
+            }}
+          >
+            {cur.exerciseGroup ?? ''}
+          </div>
+
+          {pb > 0 && (
+            <div
+              style={{
+                marginTop: 12,
+                padding: '5px 12px',
+                borderRadius: 999,
+                background: XS.pbSoft,
+                border: `1px solid ${XS.pb}33`,
+                fontFamily: XS.mono,
+                fontSize: 10,
+                color: XS.pb,
+                letterSpacing: 1.3,
+                textTransform: 'uppercase',
+                fontWeight: 600,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+              }}
+            >
+              <Icon name="trophy" size={11} /> Record · {pb} reps
+            </div>
+          )}
+        </div>
+
+        <div
+          style={{
+            padding: '18px 28px',
+            borderRadius: 24,
+            background: 'rgba(30,41,59,0.5)',
+            border: `1px solid ${XS.hairline}`,
+            backdropFilter: 'blur(10px)',
+            minWidth: 200,
+            textAlign: 'center',
+          }}
+        >
+          <div
+            style={{
+              fontFamily: XS.mono,
+              fontSize: 10,
+              color: XS.fg3,
+              letterSpacing: 1.4,
+              textTransform: 'uppercase',
+              marginBottom: 6,
+            }}
+          >
+            Objectif
+          </div>
+          <div
+            style={{
+              fontFamily: XS.font,
+              fontSize: 64,
+              fontWeight: 200,
+              color: XS.fg0,
+              letterSpacing: -2,
+              lineHeight: 0.9,
+              fontVariantNumeric: 'tabular-nums',
+            }}
+          >
+            {cur.goalType === 'fixed' ? cur.goalValue : 'MAX'}
+          </div>
+          <div
+            style={{
+              fontFamily: XS.font,
+              fontSize: 12,
+              color: XS.fg2,
+              marginTop: 4,
+            }}
+          >
+            {cur.goalType === 'fixed' ? 'répétitions' : 'effort maximal'}
+          </div>
+        </div>
+      </div>
+
+      <Btn
+        full
+        kind="primary"
+        onClick={onDone}
+        style={{ height: 52, fontSize: 16, marginTop: 14 }}
+      >
+        <Icon name="check" size={18} stroke={2.4} /> Fait
+      </Btn>
+    </div>
+  );
+}
+
+function ExerciseViewBLandscape({
+  cur,
+  onDone,
+  completedInBlock,
+  totalSetsInBlock,
+  pb,
+}: LandscapeExerciseProps) {
+  const SIZE = 180;
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        inset: 0,
+        padding: '52px 24px 14px',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      <div
+        style={{
+          flex: 1,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 24,
+          minHeight: 0,
+        }}
+      >
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div
+            style={{
+              fontFamily: XS.mono,
+              fontSize: 11,
+              color: XS.v3,
+              letterSpacing: 1.8,
+              textTransform: 'uppercase',
+              marginBottom: 10,
+            }}
+          >
+            {cur.exerciseName}
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+            {Array.from({ length: totalSetsInBlock }).map((_, i) => (
+              <div
+                key={i}
+                style={{
+                  width: 18,
+                  height: 18,
+                  borderRadius: '50%',
+                  background: i < completedInBlock ? XS.v2 : 'transparent',
+                  border: `1.5px solid ${
+                    i === completedInBlock
+                      ? XS.v3
+                      : i < completedInBlock
+                        ? XS.v2
+                        : XS.fg4
+                  }`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#fff',
+                }}
+              >
+                {i < completedInBlock && (
+                  <Icon name="check" size={9} stroke={3} />
+                )}
+                {i === completedInBlock && (
+                  <div
+                    style={{
+                      width: 5,
+                      height: 5,
+                      background: XS.v3,
+                      borderRadius: 3,
+                    }}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+          <div
+            style={{
+              fontFamily: XS.font,
+              fontSize: 13,
+              color: XS.fg2,
+            }}
+          >
+            Série {cur.setNumber} sur {totalSetsInBlock}
+            {pb > 0 && (
+              <>
+                {' '}
+                · PB{' '}
+                <span style={{ color: XS.pb, fontWeight: 600 }}>{pb}</span>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div style={{ position: 'relative', width: SIZE, height: SIZE }}>
+          <svg
+            width={SIZE}
+            height={SIZE}
+            style={{ transform: 'rotate(-90deg)' }}
+          >
+            <circle
+              cx={SIZE / 2}
+              cy={SIZE / 2}
+              r={(SIZE - 10) / 2}
+              stroke={XS.bg3}
+              strokeWidth="8"
+              fill="none"
+            />
+            <circle
+              cx={SIZE / 2}
+              cy={SIZE / 2}
+              r={(SIZE - 10) / 2}
+              stroke={XS.v2}
+              strokeWidth="8"
+              fill="none"
+              strokeLinecap="round"
+              style={{ filter: `drop-shadow(0 0 14px ${XS.vGlow})` }}
+            />
+          </svg>
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <div
+              style={{
+                fontFamily: XS.mono,
+                fontSize: 9,
+                color: XS.fg3,
+                letterSpacing: 1.4,
+                textTransform: 'uppercase',
+                marginBottom: 2,
+              }}
+            >
+              Objectif
+            </div>
+            <div
+              style={{
+                fontFamily: XS.font,
+                fontSize: cur.goalType === 'fixed' ? 70 : 44,
+                fontWeight: cur.goalType === 'fixed' ? 200 : 800,
+                color: XS.fg0,
+                letterSpacing: -2,
+                lineHeight: 1,
+                fontVariantNumeric: 'tabular-nums',
+              }}
+            >
+              {cur.goalType === 'fixed' ? cur.goalValue : 'MAX'}
+            </div>
+            <div
+              style={{
+                fontFamily: XS.font,
+                fontSize: 11,
+                color: XS.fg2,
+                marginTop: 2,
+              }}
+            >
+              {cur.goalType === 'fixed' ? 'répétitions' : 'effort'}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <Btn
+        full
+        kind="primary"
+        onClick={onDone}
+        style={{ height: 52, fontSize: 16, borderRadius: 18, marginTop: 14 }}
+      >
+        <Icon name="check" size={18} stroke={2.6} /> FAIT
+      </Btn>
+    </div>
+  );
+}
+
+interface LogRepsViewProps {
+  cur: FlatSet;
+  reps: number;
+  setReps: (n: number) => void;
+  onValidate: () => void;
+  pb: number;
+  isLast: boolean;
+  isEditing: boolean;
+  landscape: boolean;
+}
+
 function LogRepsView({
   cur,
   reps,
@@ -814,16 +1223,22 @@ function LogRepsView({
   pb,
   isLast,
   isEditing,
-}: {
-  cur: FlatSet;
-  reps: number;
-  setReps: (n: number) => void;
-  onValidate: () => void;
-  pb: number;
-  isLast: boolean;
-  isEditing: boolean;
-}) {
+  landscape,
+}: LogRepsViewProps) {
   const isPb = pb > 0 && reps > pb;
+  if (landscape) {
+    return (
+      <LogRepsViewLandscape
+        cur={cur}
+        reps={reps}
+        setReps={setReps}
+        onValidate={onValidate}
+        pb={pb}
+        isLast={isLast}
+        isEditing={isEditing}
+      />
+    );
+  }
   return (
     <div
       style={{
@@ -967,6 +1382,192 @@ function LogRepsView({
   );
 }
 
+function LogRepsViewLandscape({
+  cur,
+  reps,
+  setReps,
+  onValidate,
+  pb,
+  isLast,
+  isEditing,
+}: Omit<LogRepsViewProps, 'landscape'>) {
+  const isPb = pb > 0 && reps > pb;
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        inset: 0,
+        padding: '52px 28px 14px',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      <div
+        style={{
+          flex: 1,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 24,
+          minHeight: 0,
+        }}
+      >
+        <div
+          style={{
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minWidth: 0,
+          }}
+        >
+          <div
+            style={{
+              fontFamily: XS.mono,
+              fontSize: 10,
+              color: XS.v3,
+              letterSpacing: 1.6,
+              textTransform: 'uppercase',
+              marginBottom: 4,
+            }}
+          >
+            Combien de reps ?
+          </div>
+          <div
+            style={{
+              fontFamily: XS.font,
+              fontSize: 16,
+              fontWeight: 700,
+              color: XS.fg0,
+              marginBottom: 8,
+            }}
+          >
+            {cur.exerciseName}
+          </div>
+          <div
+            style={{
+              fontFamily: XS.font,
+              fontSize: 96,
+              fontWeight: 800,
+              color: isPb ? XS.pb : XS.fg0,
+              letterSpacing: -3,
+              lineHeight: 1,
+              fontVariantNumeric: 'tabular-nums',
+              transition: 'color 200ms',
+              textShadow: isPb
+                ? '0 0 24px rgba(251,191,36,0.5)'
+                : `0 0 24px ${XS.vGlow}`,
+            }}
+          >
+            {reps}
+          </div>
+          <div
+            style={{
+              fontFamily: XS.font,
+              fontSize: 12,
+              color: XS.fg2,
+              marginTop: 2,
+            }}
+          >
+            {cur.goalType === 'fixed'
+              ? `cible ${cur.goalValue ?? 0}`
+              : 'effort maximal'}
+          </div>
+          {isPb && (
+            <div
+              style={{
+                marginTop: 8,
+                padding: '3px 10px',
+                borderRadius: 999,
+                background: XS.pb,
+                color: '#0F172A',
+                fontFamily: XS.font,
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: 1.1,
+              }}
+            >
+              ★ NOUVEAU RECORD
+            </div>
+          )}
+        </div>
+
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 12,
+          }}
+        >
+          <div style={{ display: 'flex', gap: 12 }}>
+            <button
+              onClick={() => setReps(Math.max(0, reps - 1))}
+              style={chunkyBtnLandscapeStyle}
+            >
+              <Icon name="minus" size={22} stroke={2.5} />
+            </button>
+            <button
+              onClick={() => setReps(reps + 1)}
+              style={chunkyBtnLandscapeStyle}
+            >
+              <Icon name="plus" size={22} stroke={2.5} />
+            </button>
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {[-5, -1, +1, +5].map((p) => (
+              <button
+                key={p}
+                onClick={() => setReps(Math.max(0, reps + p))}
+                style={{
+                  padding: '5px 11px',
+                  borderRadius: 999,
+                  background: XS.bg2,
+                  border: `1px solid ${XS.hairline}`,
+                  color: XS.fg2,
+                  fontFamily: XS.mono,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                {p > 0 ? `+${p}` : p}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <Btn
+        full
+        kind="primary"
+        onClick={onValidate}
+        style={{ height: 50, fontSize: 15, marginTop: 12 }}
+      >
+        <Icon name="check" size={16} stroke={2.4} />{' '}
+        {isEditing
+          ? `Mettre à jour · ${reps} reps`
+          : isLast
+            ? 'Terminer la séance'
+            : `Valider · ${reps} reps`}
+      </Btn>
+    </div>
+  );
+}
+
+const chunkyBtnLandscapeStyle: React.CSSProperties = {
+  width: 60,
+  height: 60,
+  borderRadius: 22,
+  background: XS.bg3,
+  border: `1px solid ${XS.hairline}`,
+  color: XS.fg0,
+  cursor: 'pointer',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+};
+
 const chunkyBtnStyle: React.CSSProperties = {
   width: 78,
   height: 78,
@@ -989,6 +1590,7 @@ interface RestProps {
   next?: FlatSet;
   lastReps?: number;
   lastIsPb?: boolean;
+  landscape: boolean;
 }
 
 function RestViewA({
@@ -1000,8 +1602,23 @@ function RestViewA({
   next,
   lastReps,
   lastIsPb,
+  landscape,
 }: RestProps) {
   const pct = total > 0 ? left / total : 0;
+  if (landscape) {
+    return (
+      <RestViewALandscape
+        left={left}
+        total={total}
+        onSkip={onSkip}
+        onAdd={onAdd}
+        onEdit={onEdit}
+        next={next}
+        lastReps={lastReps}
+        lastIsPb={lastIsPb}
+      />
+    );
+  }
   return (
     <div
       style={{
@@ -1169,7 +1786,22 @@ function RestViewB({
   next,
   lastReps,
   lastIsPb,
+  landscape,
 }: RestProps) {
+  if (landscape) {
+    return (
+      <RestViewBLandscape
+        left={left}
+        total={total}
+        onSkip={onSkip}
+        onAdd={onAdd}
+        onEdit={onEdit}
+        next={next}
+        lastReps={lastReps}
+        lastIsPb={lastIsPb}
+      />
+    );
+  }
   const SIZE = 280;
   const STROKE = 12;
   const R = (SIZE - STROKE) / 2;
@@ -1364,6 +1996,442 @@ function RestViewB({
         <Btn kind="primary" onClick={onSkip} style={{ flex: 2 }}>
           <Icon name="arrowR" size={16} /> Passer
         </Btn>
+      </div>
+    </div>
+  );
+}
+
+type LandscapeRestProps = Omit<RestProps, 'landscape'>;
+
+function RestViewALandscape({
+  left,
+  total,
+  onSkip,
+  onAdd,
+  onEdit,
+  next,
+  lastReps,
+  lastIsPb,
+}: LandscapeRestProps) {
+  const pct = total > 0 ? left / total : 0;
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        inset: 0,
+        padding: '48px 28px 14px',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      <div
+        style={{
+          flex: 1,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 24,
+          minHeight: 0,
+        }}
+      >
+        <div
+          style={{
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minWidth: 0,
+          }}
+        >
+          <div
+            style={{
+              fontFamily: XS.mono,
+              fontSize: 10,
+              color: XS.v3,
+              letterSpacing: 1.8,
+              textTransform: 'uppercase',
+              marginBottom: 6,
+            }}
+          >
+            ── Récupération ──
+          </div>
+          {lastReps != null && (
+            <div
+              style={{
+                padding: '4px 11px',
+                borderRadius: 999,
+                background: lastIsPb ? XS.pbSoft : XS.vSoft,
+                border: `1px solid ${
+                  lastIsPb ? XS.pb + '44' : XS.v1 + '44'
+                }`,
+                color: lastIsPb ? XS.pb : XS.v3,
+                fontFamily: XS.mono,
+                fontSize: 10,
+                fontWeight: 600,
+                letterSpacing: 1.1,
+                marginBottom: 10,
+              }}
+            >
+              {lastIsPb && '★ '}
+              {lastReps} reps validées
+            </div>
+          )}
+          <div
+            style={{
+              fontFamily: XS.font,
+              fontSize: 120,
+              fontWeight: 200,
+              color: XS.fg0,
+              letterSpacing: -5,
+              lineHeight: 0.9,
+              fontVariantNumeric: 'tabular-nums',
+              textShadow: `0 0 32px ${XS.vGlow}`,
+            }}
+          >
+            {left}
+          </div>
+          <div
+            style={{
+              fontFamily: XS.font,
+              fontSize: 12,
+              color: XS.fg2,
+              marginTop: 4,
+            }}
+          >
+            secondes
+          </div>
+          <div
+            style={{
+              width: '100%',
+              maxWidth: 240,
+              height: 4,
+              background: XS.bg3,
+              borderRadius: 2,
+              marginTop: 14,
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                height: '100%',
+                width: `${(1 - pct) * 100}%`,
+                background: `linear-gradient(90deg, ${XS.v2}, ${XS.v3})`,
+                transition: 'width 1s linear',
+              }}
+            />
+          </div>
+        </div>
+
+        <div
+          style={{
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            gap: 12,
+            minWidth: 0,
+          }}
+        >
+          {next && (
+            <div
+              style={{
+                padding: 12,
+                borderRadius: 14,
+                background: 'rgba(30,41,59,0.6)',
+                border: `1px solid ${XS.hairline}`,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                backdropFilter: 'blur(10px)',
+              }}
+            >
+              <div
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 12,
+                  background: XS.vSoft,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Icon name={resolveIconName(next.exerciseIcon)} size={18} />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div
+                  style={{
+                    fontFamily: XS.mono,
+                    fontSize: 9,
+                    color: XS.fg3,
+                    letterSpacing: 1.3,
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  Suivant
+                </div>
+                <div
+                  style={{
+                    fontFamily: XS.font,
+                    fontSize: 14,
+                    fontWeight: 600,
+                    color: XS.fg0,
+                    marginTop: 2,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {next.exerciseName} · #{next.setNumber}/{next.totalSets}
+                </div>
+              </div>
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 8 }}>
+            {lastReps != null && (
+              <Btn kind="ghost" onClick={onEdit} style={{ flex: 1 }}>
+                <Icon name="edit" size={14} /> Modifier
+              </Btn>
+            )}
+            <Btn kind="secondary" onClick={onAdd} style={{ flex: 1 }}>
+              +15s
+            </Btn>
+            <Btn kind="primary" onClick={onSkip} style={{ flex: 2 }}>
+              Passer
+            </Btn>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RestViewBLandscape({
+  left,
+  total,
+  onSkip,
+  onAdd,
+  onEdit,
+  next,
+  lastReps,
+  lastIsPb,
+}: LandscapeRestProps) {
+  const SIZE = 200;
+  const STROKE = 10;
+  const R = (SIZE - STROKE) / 2;
+  const CIRC = 2 * Math.PI * R;
+  const ratio = total > 0 ? left / total : 0;
+  const dash = CIRC * ratio;
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        inset: 0,
+        padding: '48px 24px 14px',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      <div
+        style={{
+          flex: 1,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 24,
+          minHeight: 0,
+        }}
+      >
+        <div
+          style={{
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minWidth: 0,
+          }}
+        >
+          <div
+            style={{
+              fontFamily: XS.mono,
+              fontSize: 10,
+              color: XS.v3,
+              letterSpacing: 1.8,
+              textTransform: 'uppercase',
+              marginBottom: 6,
+            }}
+          >
+            Récupération
+          </div>
+          {lastReps != null && (
+            <div
+              style={{
+                padding: '4px 11px',
+                borderRadius: 999,
+                background: lastIsPb ? XS.pbSoft : XS.vSoft,
+                border: `1px solid ${
+                  lastIsPb ? XS.pb + '44' : XS.v1 + '44'
+                }`,
+                color: lastIsPb ? XS.pb : XS.v3,
+                fontFamily: XS.mono,
+                fontSize: 10,
+                fontWeight: 600,
+                letterSpacing: 1.1,
+                marginBottom: 8,
+              }}
+            >
+              {lastIsPb && '★ '}
+              {lastReps} reps validées
+            </div>
+          )}
+          <div style={{ position: 'relative', width: SIZE, height: SIZE }}>
+            <svg
+              width={SIZE}
+              height={SIZE}
+              style={{ transform: 'rotate(-90deg)' }}
+            >
+              <circle
+                cx={SIZE / 2}
+                cy={SIZE / 2}
+                r={R}
+                stroke={XS.bg3}
+                strokeWidth={STROKE}
+                fill="none"
+              />
+              <circle
+                cx={SIZE / 2}
+                cy={SIZE / 2}
+                r={R}
+                stroke={XS.v2}
+                strokeWidth={STROKE}
+                fill="none"
+                strokeLinecap="round"
+                strokeDasharray={`${dash} ${CIRC}`}
+                style={{
+                  transition: 'stroke-dasharray 1s linear',
+                  filter: `drop-shadow(0 0 14px ${XS.vGlow})`,
+                }}
+              />
+            </svg>
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <div
+                style={{
+                  fontFamily: XS.font,
+                  fontSize: 80,
+                  fontWeight: 200,
+                  color: XS.fg0,
+                  letterSpacing: -3,
+                  lineHeight: 1,
+                  fontVariantNumeric: 'tabular-nums',
+                }}
+              >
+                {left}
+              </div>
+              <div
+                style={{
+                  fontFamily: XS.mono,
+                  fontSize: 10,
+                  color: XS.fg2,
+                  letterSpacing: 1.4,
+                  textTransform: 'uppercase',
+                  marginTop: 2,
+                }}
+              >
+                sec
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div
+          style={{
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            gap: 12,
+            minWidth: 0,
+          }}
+        >
+          {next && (
+            <div
+              style={{
+                padding: 12,
+                borderRadius: 14,
+                background: 'rgba(30,41,59,0.6)',
+                border: `1px solid ${XS.hairline}`,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                backdropFilter: 'blur(10px)',
+              }}
+            >
+              <div
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 12,
+                  background: XS.vSoft,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Icon name={resolveIconName(next.exerciseIcon)} size={18} />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div
+                  style={{
+                    fontFamily: XS.mono,
+                    fontSize: 9,
+                    color: XS.fg3,
+                    letterSpacing: 1.3,
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  Suivant
+                </div>
+                <div
+                  style={{
+                    fontFamily: XS.font,
+                    fontSize: 14,
+                    fontWeight: 600,
+                    color: XS.fg0,
+                    marginTop: 2,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {next.exerciseName} · #{next.setNumber}/{next.totalSets}
+                </div>
+              </div>
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 8 }}>
+            {lastReps != null && (
+              <Btn kind="ghost" onClick={onEdit} style={{ flex: 1 }}>
+                <Icon name="edit" size={14} /> Modifier
+              </Btn>
+            )}
+            <Btn kind="secondary" onClick={onAdd} style={{ flex: 1 }}>
+              +15s
+            </Btn>
+            <Btn kind="primary" onClick={onSkip} style={{ flex: 2 }}>
+              <Icon name="arrowR" size={14} /> Passer
+            </Btn>
+          </div>
+        </div>
       </div>
     </div>
   );
