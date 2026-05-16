@@ -5,6 +5,7 @@ import { Btn } from '@/components/ui/primitives';
 import { Icon, resolveIconName } from '@/components/ui/Icon';
 import { fmtTime } from '@/lib/format';
 import { find } from '@/lib/store';
+import { playRestEndSound } from '@/lib/audio';
 import type {
   Exercise,
   FlatSet,
@@ -192,6 +193,9 @@ export function WorkoutScreen({
           if (settings.vibrate && navigator.vibrate) {
             navigator.vibrate([120, 80, 120]);
           }
+          if (settings.sound) {
+            playRestEndSound();
+          }
           setTimeout(() => onRestExpired(), 200);
           return 0;
         }
@@ -275,6 +279,7 @@ export function WorkoutScreen({
   function skipRest() {
     setRestLeft(0);
     if (settings.vibrate && navigator.vibrate) navigator.vibrate(60);
+    if (settings.sound) playRestEndSound();
     setTimeout(() => goNext(), 100);
   }
 
