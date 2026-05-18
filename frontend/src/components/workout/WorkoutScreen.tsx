@@ -300,6 +300,7 @@ export function WorkoutScreen({
 
   const lastResult = results[results.length - 1];
   const pb = find.pbFor(history, cur.exerciseId);
+  const pbSet = find.bestRepsForSet(history, cur.exerciseId, cur.setNumber);
 
   return (
     <div
@@ -415,6 +416,7 @@ export function WorkoutScreen({
             totalSetsInBlock={totalSetsInBlock}
             pb={pb}
             landscape={landscape}
+            pbSet={pbSet}
           />
         ) : (
           <ExerciseViewB
@@ -424,6 +426,7 @@ export function WorkoutScreen({
             totalSetsInBlock={totalSetsInBlock}
             pb={pb}
             landscape={landscape}
+            pbSet={pbSet}
           />
         ))}
 
@@ -477,6 +480,7 @@ interface ExerciseViewProps {
   totalSetsInBlock: number;
   pb: number;
   landscape: boolean;
+  pbSet: number;
 }
 
 function ExerciseViewA({
@@ -486,6 +490,7 @@ function ExerciseViewA({
   totalSetsInBlock,
   pb,
   landscape,
+  pbSet,
 }: ExerciseViewProps) {
   if (landscape) {
     return (
@@ -495,6 +500,7 @@ function ExerciseViewA({
         completedInBlock={completedInBlock}
         totalSetsInBlock={totalSetsInBlock}
         pb={pb}
+        pbSet={pbSet}
       />
     );
   }
@@ -640,7 +646,7 @@ function ExerciseViewA({
               gap: 6,
             }}
           >
-            <Icon name="trophy" size={12} /> Record · {pb} reps
+            <Icon name="trophy" size={12} /> Record série · {pbSet} reps
           </div>
         )}
       </div>
@@ -664,6 +670,7 @@ function ExerciseViewB({
   totalSetsInBlock,
   pb,
   landscape,
+  pbSet,
 }: ExerciseViewProps) {
   if (landscape) {
     return (
@@ -673,6 +680,7 @@ function ExerciseViewB({
         completedInBlock={completedInBlock}
         totalSetsInBlock={totalSetsInBlock}
         pb={pb}
+        pbSet={pbSet}
       />
     );
   }
@@ -866,6 +874,7 @@ function ExerciseViewALandscape({
   completedInBlock,
   totalSetsInBlock,
   pb,
+  pbSet,
 }: LandscapeExerciseProps) {
   return (
     <div
@@ -961,7 +970,7 @@ function ExerciseViewALandscape({
                 gap: 6,
               }}
             >
-              <Icon name="trophy" size={11} /> Record · {pb} reps
+              <Icon name="trophy" size={11} /> Record série · {pbSet} reps
             </div>
           )}
         </div>
@@ -1033,6 +1042,7 @@ function ExerciseViewBLandscape({
   completedInBlock,
   totalSetsInBlock,
   pb,
+  pbSet,
 }: LandscapeExerciseProps) {
   const SIZE = 180;
   return (

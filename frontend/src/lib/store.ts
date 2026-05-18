@@ -526,6 +526,25 @@ export const find = {
     }
     return max;
   },
+  bestRepsForSet(
+    history: SessionLog[],
+    exerciseId: Exercise['id'],
+    setNumber: number,
+  ): number {
+    let max = 0;
+    for (const log of history) {
+      for (const pl of log.performance_logs) {
+        if (
+          String(pl.exercise_id) === String(exerciseId) &&
+          pl.set_number === setNumber &&
+          pl.reps_done > max
+        ) {
+          max = pl.reps_done;
+        }
+      }
+    }
+    return max;
+  },
   lastRepsFor(
     history: SessionLog[],
     exerciseId: Exercise['id'],
